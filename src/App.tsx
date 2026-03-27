@@ -8,7 +8,9 @@ const EXAMPLES = [
 ];
 
 async function getClaraReplyFromAPI(input: string): Promise<string> {
-  if (!input.trim()) {
+  const trimmedInput = input.trim();
+
+  if (!trimmedInput) {
     return "Beskriv ditt problem kort så hjälper jag dig.";
   }
 
@@ -18,15 +20,143 @@ async function getClaraReplyFromAPI(input: string): Promise<string> {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ problem: input }),
+      body: JSON.stringify({ problem: trimmedInput }),
     });
 
+    if (!response.ok) {
+      return "Kunde inte hämta svar just nu.";
+    }
+
     const data = await response.json();
-    return data.reply || "Fick inget svar.";
+    return data.reply || "Fick inget svar. Testa igen.";
   } catch {
-    return "Kunde inte nå tjänsten.";
+    return "Kunde inte nå tjänsten just nu.";
   }
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #f6f7fb 0%, #eef2ff 100%)",
+    padding: "24px 16px 40px",
+    fontFamily: "Arial, sans-serif",
+    color: "#1f2937",
+  } as React.CSSProperties,
+  shell: {
+    maxWidth: 480,
+    margin: "0 auto",
+  } as React.CSSProperties,
+  logoWrap: {
+    textAlign: "center" as const,
+    marginBottom: 20,
+  } as React.CSSProperties,
+  logo: {
+    maxWidth: 180,
+    width: "100%",
+    height: "auto",
+  } as React.CSSProperties,
+  card: {
+    background: "#ffffff",
+    borderRadius: 28,
+    padding: 22,
+    boxShadow: "0 18px 45px rgba(15, 23, 42, 0.10)",
+    border: "1px solid rgba(99, 102, 241, 0.10)",
+  } as React.CSSProperties,
+  intro: {
+    fontSize: 16,
+    lineHeight: 1.5,
+    color: "#4b5563",
+    margin: "0 0 18px 0",
+  } as React.CSSProperties,
+  label: {
+    display: "block",
+    fontSize: 14,
+    fontWeight: 700,
+    marginBottom: 8,
+    color: "#374151",
+  } as React.CSSProperties,
+  textarea: {
+    width: "100%",
+    minHeight: 140,
+    resize: "vertical" as const,
+    borderRadius: 18,
+    border: "1px solid #d1d5db",
+    padding: 16,
+    fontSize: 16,
+    lineHeight: 1.5,
+    boxSizing: "border-box" as const,
+    outline: "none",
+    background: "#fcfcff",
+  } as React.CSSProperties,
+  primaryButton: {
+    width: "100%",
+    border: "none",
+    borderRadius: 18,
+    padding: "15px 18px",
+    fontSize: 16,
+    fontWeight: 700,
+    color: "white",
+    background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+    cursor: "pointer",
+    boxShadow: "0 10px 24px rgba(79, 70, 229, 0.30)",
+    marginTop: 12,
+  } as React.CSSProperties,
+  section: {
+    marginTop: 22,
+  } as React.CSSProperties,
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#374151",
+    marginBottom: 10,
+  } as React.CSSProperties,
+  chipWrap: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap" as const,
+  } as React.CSSProperties,
+  chip: {
+    border: "1px solid #c7d2fe",
+    background: "#eef2ff",
+    color: "#3730a3",
+    borderRadius: 999,
+    padding: "10px 14px",
+    fontSize: 14,
+    cursor: "pointer",
+  } as React.CSSProperties,
+  answerCard: {
+    marginTop: 22,
+    background: "#f8fafc",
+    borderRadius: 22,
+    padding: 18,
+    border: "1px solid #e5e7eb",
+  } as React.CSSProperties,
+  answerTitle: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#374151",
+    marginBottom: 8,
+  } as React.CSSProperties,
+  answerText: {
+    margin: 0,
+    whiteSpace: "pre-line" as const,
+    lineHeight: 1.6,
+    fontSize: 16,
+    color: "#111827",
+  } as React.CSSProperties,
+  secondaryButton: {
+    width: "100%",
+    border: "1px solid #c7d2fe",
+    borderRadius: 18,
+    padding: "13px 18px",
+    fontSize: 15,
+    fontWeight: 700,
+    color: "#3730a3",
+    background: "#eef2ff",
+    cursor: "pointer",
+    marginTop: 12,
+  } as React.CSSProperties,
+};
 
 export default function App() {
   const [problem, setProblem] = useState("");
@@ -39,134 +169,80 @@ export default function App() {
     setLoading(true);
     setReply("Clara tänker...");
 
-    const result = await getClaraReplyFromAPI(problem);
-
-    setReply(result);
-    setLoading(false);
+    try {
+      const result = await getClaraReplyFromAPI(problem);
+      setReply(result);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleExampleClick(example: string) {
+    setShowExamples(false);
     setProblem(example);
-    handleSubmit();
+    setLoading(true);
+    setReply("Clara tänker...");
+
+    try {
+      const result = await getClaraReplyFromAPI(example);
+      setReply(result);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div style={styles.page}>
-      <div style={styles.container}>
-        <img src={claraLogo} style={styles.logo} />
+      <div style={styles.shell}>
+        <div style={styles.logoWrap}>
+          <img src={claraLogo} alt="logo" style={styles.logo} />
+        </div>
 
-        <h1 style={styles.title}>Få hjälp med vardagen</h1>
-        <p style={styles.subtitle}>
-          Beskriv ditt problem så får du ett tydligt teknikförslag
-        </p>
+        <div style={styles.card}>
+          <p style={styles.intro}>Beskriv ditt problem så får du ett tydligt teknikförslag.</p>
 
-        <textarea
-          value={problem}
-          onChange={(e) => setProblem(e.target.value)}
-          placeholder="Till exempel: Jag kan inte läsa min post"
-          style={styles.textarea}
-        />
+          <label style={styles.label}>Beskriv ditt problem</label>
+          <textarea
+            value={problem}
+            onChange={(e) => {
+              setProblem(e.target.value);
+            }}
+            placeholder="Till exempel: Jag kan inte läsa min post"
+            style={styles.textarea}
+          />
 
-        <button onClick={handleSubmit} style={styles.button}>
-          {loading ? "Clara tänker..." : "Få hjälp"}
-        </button>
+          <button onClick={handleSubmit} disabled={loading} style={styles.primaryButton}>
+            {loading ? "Clara tänker..." : "Få hjälp"}
+          </button>
 
-        {showExamples && (
-          <div style={styles.examples}>
-            {EXAMPLES.map((e) => (
-              <button key={e} onClick={() => handleExampleClick(e)} style={styles.chip}>
-                {e}
-              </button>
-            ))}
+          {showExamples && (
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>Prova ett exempel</div>
+              <div style={styles.chipWrap}>
+                {EXAMPLES.map((example) => (
+                  <button key={example} onClick={() => void handleExampleClick(example)} style={styles.chip}>
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={styles.answerCard}>
+            <div style={styles.answerTitle}>Svar</div>
+            <p style={styles.answerText}>{reply}</p>
           </div>
-        )}
 
-        <div style={styles.answerBox}>
-          <h3 style={styles.answerTitle}>Svar</h3>
-          <p style={styles.answerText}>{reply}</p>
+          {!showExamples && (
+            <button onClick={() => setShowExamples(true)} style={styles.secondaryButton}>
+              Visa exempel igen
+            </button>
+          )} style={styles.secondaryButton}>
+              Visa exempel igen
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#f4f6fb",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    fontFamily: "system-ui",
-  },
-  container: {
-    width: "100%",
-    maxWidth: 420,
-    background: "white",
-    borderRadius: 20,
-    padding: 24,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-    textAlign: "center" as const,
-  },
-  logo: {
-    width: 140,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 22,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#555",
-    marginBottom: 20,
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 100,
-    padding: 12,
-    borderRadius: 12,
-    border: "1px solid #ddd",
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  button: {
-    width: "100%",
-    padding: 14,
-    borderRadius: 12,
-    border: "none",
-    background: "#5b5ce6",
-    color: "white",
-    fontWeight: 600,
-    cursor: "pointer",
-    marginBottom: 16,
-  },
-  examples: {
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: 8,
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  chip: {
-    padding: "8px 12px",
-    borderRadius: 20,
-    border: "1px solid #ccc",
-    background: "#f1f3f8",
-    cursor: "pointer",
-    fontSize: 13,
-  },
-  answerBox: {
-    background: "#f9fafc",
-    borderRadius: 12,
-    padding: 16,
-    textAlign: "left" as const,
-  },
-  answerTitle: {
-    marginBottom: 6,
-  },
-  answerText: {
-    margin: 0,
-    lineHeight: 1.5,
-  },
-};
