@@ -61,33 +61,6 @@ function getBestSwedishVoice(): SpeechSynthesisVoice | null {
   );
 }
 
-function speakText(text: string) {
-  if (!text || typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
-
-  const synth = window.speechSynthesis;
-  const utterance = new SpeechSynthesisUtterance(text);
-  const bestVoice = getBestSwedishVoice();
-
-  utterance.text = text;
-  utterance.lang = "sv-SE";
-  utterance.rate = 1;
-  utterance.pitch = 1;
-  utterance.volume = 1;
-
-  if (bestVoice) {
-    utterance.voice = bestVoice;
-    utterance.lang = bestVoice.lang;
-    console.log("Using voice:", bestVoice.name, bestVoice.lang);
-  } else {
-    console.log("No Swedish voice found, falling back to sv-SE");
-  }
-
-  synth.cancel();
-  synth.speak(utterance);
-}
-
 const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
@@ -224,6 +197,7 @@ export default function App() {
   const [reply, setReply] = useState(INITIAL_REPLY);
   const [loading, setLoading] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -247,11 +221,25 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
   const showReadButton = useMemo(() => {
     return !loading && reply !== "" && reply !== INITIAL_REPLY && reply !== THINKING_REPLY;
   }, [loading, reply]);
 
   async function runQuery(input: string) {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
     setShowExamples(false);
     setLoading(true);
     setReply(THINKING_REPLY);
@@ -277,10 +265,58 @@ export default function App() {
     setShowExamples(true);
     setProblem("");
     setReply(INITIAL_REPLY);
+    setIsSpeaking(false);
 
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
+  }
+
+  function handleToggleSpeech() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+
+    const synth = window.speechSynthesis;
+
+    if (isSpeaking) {
+      synth.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    if (!reply || reply === INITIAL_REPLY || reply === THINKING_REPLY) {
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(reply);
+    const bestVoice = getBestSwedishVoice();
+
+    utterance.text = reply;
+    utterance.lang = "sv-SE";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    if (bestVoice) {
+      utterance.voice = bestVoice;
+      utterance.lang = bestVoice.lang;
+      console.log("Using voice:", bestVoice.name, bestVoice.lang);
+    } else {
+      console.log("No Swedish voice found, falling back to sv-SE");
+    }
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+    };
+
+    synth.cancel();
+    synth.speak(utterance);
+    setIsSpeaking(true);
   }
 
   return (
@@ -346,11 +382,11 @@ export default function App() {
           {showReadButton && (
             <button
               type="button"
-              onClick={() => speakText(reply)}
+              onClick={handleToggleSpeech}
               style={styles.secondaryButton}
-              aria-label="Läs upp svaret"
+              aria-label={isSpeaking ? "Sluta läs upp" : "Läs upp svaret"}
             >
-              Läs upp svaret
+              {isSpeaking ? "Sluta läs upp" : "Läs upp svaret"}
             </button>
           )}
 
