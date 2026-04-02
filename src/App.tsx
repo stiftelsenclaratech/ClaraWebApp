@@ -12,6 +12,8 @@ const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
 const THINKING_REPLY = "Clara tänker...";
 const CLARA_PURPLE = "#6d28d9";
 
+type ThemeMode = "system" | "light" | "dark";
+
 async function getClaraReplyFromAPI(input: string): Promise<string> {
   const trimmedInput = input.trim();
 
@@ -174,14 +176,21 @@ function createStyles(
         : "0 12px 32px rgba(0,0,0,0.10)",
       textAlign: "center",
     },
-    logoSection: {
-      display: "flex",
-      flexDirection: "column",
+    topBar: {
+      display: "grid",
+      gridTemplateColumns: "1fr auto 1fr",
       alignItems: "center",
       gap: 12,
-      marginBottom: 16,
+      marginBottom: 18,
     },
-    logoWrap: {
+    leftControls: {
+      justifySelf: "start",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    },
+    centerLogo: {
+      justifySelf: "center",
       display: "inline-flex",
       justifyContent: "center",
       alignItems: "center",
@@ -192,58 +201,35 @@ function createStyles(
         ? "0 8px 20px rgba(0,0,0,0.25)"
         : "0 6px 16px rgba(0,0,0,0.08)",
     },
+    rightControls: {
+      justifySelf: "end",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    },
     logo: {
       width: 150,
       display: "block",
     },
-    controlsRow: {
-      display: "flex",
-      justifyContent: "center",
-      gap: 10,
-      width: "100%",
-      flexWrap: "wrap",
-    },
-    controlCard: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-      alignItems: "center",
-      background: isDarkMode ? "#1f2937" : "#f8fafc",
-      border: isDarkMode ? "1px solid #374151" : "1px solid #e5e7eb",
-      borderRadius: 16,
-      padding: "10px 12px",
-      minWidth: 140,
-    },
-    controlLabel: {
-      fontSize: 12 * scale,
-      fontWeight: 700,
-      color: isDarkMode ? "#e5e7eb" : "#374151",
-      lineHeight: 1.2,
-    },
     iconButton: {
-      width: 52,
-      height: 52,
-      borderRadius: 16,
-      border: "1px solid #d8d8e2",
-      background: "#ffffff",
+      width: 40,
+      height: 40,
+      borderRadius: 14,
+      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
+      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
       color: CLARA_PURPLE,
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
-    },
-    textSizeRow: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
+      backdropFilter: "blur(4px)",
     },
     sizeButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 14,
-      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
-      background: isDarkMode ? "#312e81" : "#eef2ff",
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
+      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
       color: isDarkMode ? "#e0e7ff" : "#3730a3",
       fontSize: 22 * scale,
       fontWeight: 700,
@@ -253,22 +239,23 @@ function createStyles(
       justifyContent: "center",
       lineHeight: 1,
       flexShrink: 0,
+      backdropFilter: "blur(4px)",
     },
     sizePreview: {
-      width: 64,
-      height: 40,
-      borderRadius: 14,
+      width: 46,
+      height: 36,
+      borderRadius: 12,
       border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "#111827" : "#ffffff",
+      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
       color: CLARA_PURPLE,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       boxSizing: "border-box",
       fontWeight: 800,
-      fontSize: `${clamp(16 + textSizeStep * 4, 12, 52)}px`,
+      fontSize: `${clamp(16 + textSizeStep * 4, 12, 60)}px`,
       lineHeight: 1,
-      boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
+      backdropFilter: "blur(4px)",
     },
     intro: {
       fontSize: 16 * scale,
@@ -391,10 +378,60 @@ export default function App() {
   const [showExamples, setShowExamples] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [systemDarkMode, setSystemDarkMode] = useState(false);
-  const [manualTheme, setManualTheme] = useState<"system" | "light" | "dark">(
-    "system"
-  );
+  const [manualTheme, setManualTheme] = useState<ThemeMode>("system");
   const [textSizeStep, setTextSizeStep] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const savedTheme = window.localStorage.getItem("clara-theme");
+      const savedTextSize = window.localStorage.getItem("clara-text-size");
+
+      if (
+        savedTheme === "system" ||
+        savedTheme === "light" ||
+        savedTheme === "dark"
+      ) {
+        setManualTheme(savedTheme);
+      }
+
+      if (savedTextSize !== null) {
+        const parsed = Number(savedTextSize);
+        if (!Number.isNaN(parsed)) {
+          setTextSizeStep(clamp(parsed, -4, 10));
+        }
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem("clara-theme", manualTheme);
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [manualTheme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem("clara-text-size", String(textSizeStep));
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [textSizeStep]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -568,57 +605,51 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.logoSection}>
-          <div style={styles.logoWrap}>
+        <div style={styles.topBar}>
+          <div style={styles.leftControls}>
+            <button
+              type="button"
+              onClick={decreaseTextSize}
+              style={styles.sizeButton}
+              aria-label={`Minska textstorleken. ${getTextSizeDescription()}`}
+              title="Minska textstorleken"
+            >
+              −
+            </button>
+
+            <div
+              style={styles.sizePreview}
+              aria-live="polite"
+              aria-label={getTextSizeDescription()}
+            >
+              T
+            </div>
+
+            <button
+              type="button"
+              onClick={increaseTextSize}
+              style={styles.sizeButton}
+              aria-label={`Öka textstorleken. ${getTextSizeDescription()}`}
+              title="Öka textstorleken"
+            >
+              +
+            </button>
+          </div>
+
+          <div style={styles.centerLogo}>
             <img src={claraLogo} alt="Clara" style={styles.logo} />
           </div>
 
-          <div style={styles.controlsRow}>
-            <div style={styles.controlCard}>
-              <div style={styles.controlLabel}>Tema</div>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                style={styles.iconButton}
-                aria-label={getThemeAriaLabel()}
-                title={getThemeAriaLabel()}
-              >
-                {isDarkMode ? <SunIcon size={24} /> : <MoonIcon size={24} />}
-              </button>
-            </div>
-
-            <div style={styles.controlCard}>
-              <div style={styles.controlLabel}>Textstorlek</div>
-              <div style={styles.textSizeRow}>
-                <button
-                  type="button"
-                  onClick={decreaseTextSize}
-                  style={styles.sizeButton}
-                  aria-label={`Minska textstorleken. ${getTextSizeDescription()}`}
-                  title="Minska textstorleken"
-                >
-                  −
-                </button>
-
-                <div
-                  style={styles.sizePreview}
-                  aria-live="polite"
-                  aria-label={getTextSizeDescription()}
-                >
-                  T
-                </div>
-
-                <button
-                  type="button"
-                  onClick={increaseTextSize}
-                  style={styles.sizeButton}
-                  aria-label={`Öka textstorleken. ${getTextSizeDescription()}`}
-                  title="Öka textstorleken"
-                >
-                  +
-                </button>
-              </div>
-            </div>
+          <div style={styles.rightControls}>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              style={styles.iconButton}
+              aria-label={getThemeAriaLabel()}
+              title={getThemeAriaLabel()}
+            >
+              {isDarkMode ? <SunIcon size={24} /> : <MoonIcon size={24} />}
+            </button>
           </div>
         </div>
 
