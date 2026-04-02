@@ -10,6 +10,7 @@ const EXAMPLES = [
 
 const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
 const THINKING_REPLY = "Clara tänker...";
+const CLARA_PURPLE = "#6d28d9";
 
 async function getClaraReplyFromAPI(input: string): Promise<string> {
   const trimmedInput = input.trim();
@@ -62,7 +63,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function getFontScale(step: number) {
-  return 1 + step * 0.08;
+  return 1 + step * 0.06;
 }
 
 function formatReply(
@@ -107,6 +108,43 @@ function formatReply(
         </p>
       );
     });
+}
+
+function SunIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4.5" fill={CLARA_PURPLE} />
+      <path
+        d="M12 1.8V4.2M12 19.8V22.2M4.2 12H1.8M22.2 12H19.8M5.1 5.1L6.8 6.8M17.2 17.2L18.9 18.9M18.9 5.1L17.2 6.8M6.8 17.2L5.1 18.9"
+        stroke={CLARA_PURPLE}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M20 14.2C19.2 14.5 18.4 14.6 17.5 14.6C13.4 14.6 10.1 11.3 10.1 7.2C10.1 5.8 10.5 4.5 11.2 3.4C6.8 3.9 3.4 7.7 3.4 12.2C3.4 17.1 7.3 21 12.2 21C16.7 21 20.5 17.6 21 13.2C20.7 13.6 20.4 13.9 20 14.2Z"
+        fill={CLARA_PURPLE}
+      />
+    </svg>
+  );
 }
 
 function createStyles(
@@ -164,7 +202,7 @@ function createStyles(
       flexDirection: "column",
       gap: 8,
       alignItems: "stretch",
-      minWidth: 132,
+      minWidth: 136,
     },
     controlGroup: {
       display: "flex",
@@ -178,16 +216,17 @@ function createStyles(
       color: isDarkMode ? "#e5e7eb" : "#374151",
       lineHeight: 1.2,
     },
-    darkModeButton: {
+    iconButton: {
       width: "100%",
-      padding: "10px 12px",
+      height: 42,
       borderRadius: 12,
       border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
       background: isDarkMode ? "#312e81" : "#eef2ff",
-      color: isDarkMode ? "#e0e7ff" : "#3730a3",
-      fontSize: 13 * scale,
-      fontWeight: 700,
+      color: CLARA_PURPLE,
       cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
     textSizeRow: {
       display: "flex",
@@ -210,21 +249,21 @@ function createStyles(
       lineHeight: 1,
       flexShrink: 0,
     },
-    sizeValue: {
+    sizePreview: {
       flex: 1,
       minWidth: 0,
       height: 36,
       borderRadius: 12,
       border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
       background: isDarkMode ? "#1f2937" : "#fcfcff",
-      color: isDarkMode ? "#f9fafb" : "#111827",
-      fontSize: 13 * scale,
-      fontWeight: 700,
+      color: CLARA_PURPLE,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "0 8px",
       boxSizing: "border-box",
+      fontWeight: 800,
+      fontSize: `${clamp(16 + textSizeStep * 2, 12, 32)}px`,
+      lineHeight: 1,
     },
     intro: {
       fontSize: 16 * scale,
@@ -483,21 +522,11 @@ export default function App() {
   }
 
   function increaseTextSize() {
-    setTextSizeStep((prev) => clamp(prev + 1, -2, 4));
+    setTextSizeStep((prev) => clamp(prev + 1, -4, 6));
   }
 
   function decreaseTextSize() {
-    setTextSizeStep((prev) => clamp(prev - 1, -2, 4));
-  }
-
-  function getTextSizeLabel() {
-    if (textSizeStep <= -2) return "Mycket liten";
-    if (textSizeStep === -1) return "Liten";
-    if (textSizeStep === 0) return "Normal";
-    if (textSizeStep === 1) return "Lite större";
-    if (textSizeStep === 2) return "Stor";
-    if (textSizeStep === 3) return "Mycket stor";
-    return "Extra stor";
+    setTextSizeStep((prev) => clamp(prev - 1, -4, 6));
   }
 
   return (
@@ -510,21 +539,21 @@ export default function App() {
 
           <div style={styles.controlsWrap}>
             <div style={styles.controlGroup}>
-              <div style={styles.controlLabel}>Dark mode</div>
+              <div style={styles.controlLabel}>Tema</div>
               <button
                 type="button"
                 onClick={() => setManualDarkMode((prev) => !prev)}
-                style={styles.darkModeButton}
+                style={styles.iconButton}
                 aria-label={
-                  manualDarkMode ? "Stäng av dark mode" : "Slå på dark mode"
+                  manualDarkMode ? "Byt till ljust läge" : "Byt till mörkt läge"
                 }
               >
-                {manualDarkMode ? "På" : "Av"}
+                {isDarkMode ? <SunIcon size={22} /> : <MoonIcon size={22} />}
               </button>
             </div>
 
             <div style={styles.controlGroup}>
-              <div style={styles.controlLabel}>Textstorlek</div>
+              <div style={styles.controlLabel}>Text</div>
               <div style={styles.textSizeRow}>
                 <button
                   type="button"
@@ -535,8 +564,8 @@ export default function App() {
                   −
                 </button>
 
-                <div style={styles.sizeValue} aria-live="polite">
-                  {getTextSizeLabel()}
+                <div style={styles.sizePreview} aria-live="polite">
+                  T
                 </div>
 
                 <button
