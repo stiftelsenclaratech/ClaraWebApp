@@ -1,11 +1,11 @@
-import OpenAI from "openai";
+export default async function handler(req: any, res: any) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ reply: "Method not allowed" });
+  }
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+  const { problem } = req.body;
 
-const CLARA_INSTRUCTIONS = `
-Du är Clara, en AI som hjälper personer med synnedsättning att förstå hur teknik kan hjälpa i vardagen.
+  const CLARA_SYSTEM_PROMPT = `Du är Clara, en AI som hjälper personer med synnedsättning att förstå hur teknik kan hjälpa i vardagen.
 
 Du ska inte ge detaljerade steg för steg instruktioner om hur man trycker i telefonen.
 
@@ -17,16 +17,16 @@ Hjälpa användaren välja ett bra första alternativ.
 
 Struktur för varje svar:
 
-**Det här kan hjälpa dig**
+Det här kan hjälpa dig
 Ge 2 till 3 konkreta lösningar.
 Varje lösning ska vara verklig och vanlig teknik, inte påhittad.
 Beskriv kort vad den gör i praktiken.
 
-**Enkelt att börja med**
+Enkelt att börja med
 Rekommendera en lösning.
 Förklara varför den är bäst att börja med.
 
-**Bra att veta**
+Bra att veta
 Ge trygghet.
 Sätt realistiska förväntningar.
 Håll det kort.
@@ -56,39 +56,32 @@ Ställ en enkel följdfråga istället för att gissa.
 Målet:
 Användaren ska känna "det här fattar jag" och "det här kan jag testa".
 
-Svara alltid på svenska.
-`;
-
-export default async function handler(req: any, res: any) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ reply: "Method not allowed" });
-  }
+Svara alltid på svenska.`;
 
   try {
-    const problem = String(req.body?.problem ?? "").trim();
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: `${CLARA_SYSTEM_PROMPT}
 
-    if (!problem) {
-      return res.status(200).json({
-        reply: "Beskriv ditt problem kort så hjälper jag dig.",
-      });
-    }
-
-    const response = await client.responses.create({
-      model: "gpt-5.4",
-      instructions: CLARA_INSTRUCTIONS,
-      input: problem,
+Problem: ${problem}`,
+      }),
     });
 
-    const reply =
-      response.output_text?.trim() ||
-      "Jag kunde inte formulera ett svar just nu. Försök igen.";
+    const data = await response.json();
 
-    return res.status(200).json({ reply });
-  } catch (error) {
-    console.error("Clara API error:", error);
+    const text =
+      data?.output_text ||
+      data?.output?.[0]?.content?.[0]?.text ||
+      "Fick inget svar.";
 
-    return res.status(200).json({
-      reply: "Kunde inte nå Clara just nu. Försök igen om en liten stund.",
-    });
+    return res.status(200).json({ reply: text });
+  } catch {
+    return res.status(500).json({ reply: "Fel vid anrop." });
   }
 }
