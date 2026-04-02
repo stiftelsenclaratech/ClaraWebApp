@@ -12,7 +12,7 @@ const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
 const THINKING_REPLY = "Clara tänker...";
 const CLARA_PURPLE = "#6d28d9";
 
-type ThemeMode = "system" | "light" | "dark";
+type ThemeMode = "light" | "dark" | "contrast";
 
 async function getClaraReplyFromAPI(input: string): Promise<string> {
   const trimmedInput = input.trim();
@@ -112,43 +112,6 @@ function formatReply(
     });
 }
 
-function SunIcon({ size = 22 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="4.5" fill={CLARA_PURPLE} />
-      <path
-        d="M12 1.8V4.2M12 19.8V22.2M4.2 12H1.8M22.2 12H19.8M5.1 5.1L6.8 6.8M17.2 17.2L18.9 18.9M18.9 5.1L17.2 6.8M6.8 17.2L5.1 18.9"
-        stroke={CLARA_PURPLE}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MoonIcon({ size = 22 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M20 14.2C19.2 14.5 18.4 14.6 17.5 14.6C13.4 14.6 10.1 11.3 10.1 7.2C10.1 5.8 10.5 4.5 11.2 3.4C6.8 3.9 3.4 7.7 3.4 12.2C3.4 17.1 7.3 21 12.2 21C16.7 21 20.5 17.6 21 13.2C20.7 13.6 20.4 13.9 20 14.2Z"
-        fill={CLARA_PURPLE}
-      />
-    </svg>
-  );
-}
-
 function MenuIcon({ size = 22 }: { size?: number }) {
   return (
     <svg
@@ -168,16 +131,121 @@ function MenuIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function SunIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4.5" fill={CLARA_PURPLE} />
+      <path
+        d="M12 1.8V4.2M12 19.8V22.2M4.2 12H1.8M22.2 12H19.8M5.1 5.1L6.8 6.8M17.2 17.2L18.9 18.9M18.9 5.1L17.2 6.8M6.8 17.2L5.1 18.9"
+        stroke={CLARA_PURPLE}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M20 14.2C19.2 14.5 18.4 14.6 17.5 14.6C13.4 14.6 10.1 11.3 10.1 7.2C10.1 5.8 10.5 4.5 11.2 3.4C6.8 3.9 3.4 7.7 3.4 12.2C3.4 17.1 7.3 21 12.2 21C16.7 21 20.5 17.6 21 13.2C20.7 13.6 20.4 13.9 20 14.2Z"
+        fill={CLARA_PURPLE}
+      />
+    </svg>
+  );
+}
+
+function ContrastIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="8" stroke={CLARA_PURPLE} strokeWidth="2" />
+      <path d="M12 4a8 8 0 0 1 0 16Z" fill={CLARA_PURPLE} />
+    </svg>
+  );
+}
+
+function ThemePreviewIcon({
+  mode,
+  size = 20,
+}: {
+  mode: ThemeMode;
+  size?: number;
+}) {
+  if (mode === "dark") {
+    return <MoonIcon size={size} />;
+  }
+
+  if (mode === "contrast") {
+    return <ContrastIcon size={size} />;
+  }
+
+  return <SunIcon size={size} />;
+}
+
+function getThemeLabel(mode: ThemeMode) {
+  if (mode === "dark") return "Mörkt läge";
+  if (mode === "contrast") return "Hög kontrast";
+  return "Ljust läge";
+}
+
 function createStyles(
-  isDarkMode: boolean,
+  themeMode: ThemeMode,
   textSizeStep: number
 ): Record<string, CSSProperties> {
   const scale = getFontScale(textSizeStep);
+  const isDark = themeMode === "dark";
+  const isContrast = themeMode === "contrast";
+
+  const pageBackground = isContrast ? "#000000" : isDark ? "#0f172a" : "#f4f6fb";
+  const containerBackground = isContrast ? "#000000" : isDark ? "#111827" : "#ffffff";
+  const containerBorder = isContrast ? "2px solid #ffffff" : "none";
+  const mainText = isContrast ? "#ffffff" : isDark ? "#d1d5db" : "#111827";
+  const secondaryText = isContrast ? "#ffffff" : isDark ? "#e5e7eb" : "#374151";
+  const mutedText = isContrast ? "#ffffff" : isDark ? "#d1d5db" : "#5b4b73";
+  const softPanel = isContrast ? "#000000" : isDark ? "#1f2937" : "#f8fafc";
+  const textFieldBg = isContrast ? "#000000" : isDark ? "#1f2937" : "#fcfcff";
+  const borderColor = isContrast ? "2px solid #ffffff" : isDark ? "1px solid #374151" : "1px solid #d8d8e2";
+  const softBorder = isContrast ? "2px solid #ffffff" : isDark ? "1px solid #374151" : "1px solid #e5e7eb";
+  const chipBorder = isContrast ? "2px solid #ffffff" : isDark ? "1px solid #4338ca" : "1px solid #c7d2fe";
+  const chipBg = isContrast ? "#000000" : isDark ? "#312e81" : "#eef2ff";
+  const chipText = isContrast ? "#ffffff" : isDark ? "#e0e7ff" : "#3730a3";
+  const iconBg = isContrast ? "#000000" : isDark ? "#111827" : "#f8fafc";
+  const iconBorder = isContrast ? "2px solid #ffffff" : isDark ? "1px solid #374151" : "1px solid #d8d8e2";
+  const primaryBg = isContrast
+    ? "linear-gradient(135deg, #ffffff 0%, #d1d5db 100%)"
+    : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)";
+  const primaryText = isContrast ? "#000000" : "#ffffff";
+  const boxShadow = isContrast
+    ? "none"
+    : isDark
+    ? "0 12px 32px rgba(0,0,0,0.35)"
+    : "0 12px 32px rgba(0,0,0,0.10)";
+  const logoShadow = isContrast ? "none" : "0 6px 16px rgba(0,0,0,0.08)";
+  const menuShadow = isContrast ? "none" : "0 18px 38px rgba(0,0,0,0.12)";
 
   return {
     page: {
       minHeight: "100vh",
-      background: isDarkMode ? "#0f172a" : "#f4f6fb",
+      background: pageBackground,
       display: "flex",
       justifyContent: "center",
       alignItems: "flex-start",
@@ -187,12 +255,11 @@ function createStyles(
     container: {
       width: "100%",
       maxWidth: 480,
-      background: isDarkMode ? "#111827" : "#ffffff",
+      background: containerBackground,
       borderRadius: 24,
       padding: 24,
-      boxShadow: isDarkMode
-        ? "0 12px 32px rgba(0,0,0,0.35)"
-        : "0 12px 32px rgba(0,0,0,0.10)",
+      boxShadow,
+      border: containerBorder,
       textAlign: "center",
       position: "relative",
     },
@@ -215,9 +282,8 @@ function createStyles(
       background: "#ffffff",
       borderRadius: 18,
       padding: "10px 16px",
-      boxShadow: isDarkMode
-        ? "0 8px 20px rgba(0,0,0,0.25)"
-        : "0 6px 16px rgba(0,0,0,0.08)",
+      boxShadow: logoShadow,
+      border: isContrast ? "2px solid #ffffff" : "none",
     },
     logo: {
       width: 150,
@@ -231,26 +297,23 @@ function createStyles(
       width: 40,
       height: 40,
       borderRadius: 14,
-      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
+      border: iconBorder,
+      background: iconBg,
       color: CLARA_PURPLE,
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      backdropFilter: "blur(4px)",
     },
     menuPanel: {
       position: "absolute",
       top: 48,
       right: 0,
-      width: 220,
-      background: isDarkMode ? "#1f2937" : "#ffffff",
-      border: isDarkMode ? "1px solid #374151" : "1px solid #e5e7eb",
+      width: 230,
+      background: softPanel,
+      border: softBorder,
       borderRadius: 18,
-      boxShadow: isDarkMode
-        ? "0 18px 38px rgba(0,0,0,0.35)"
-        : "0 18px 38px rgba(0,0,0,0.12)",
+      boxShadow: menuShadow,
       padding: 14,
       zIndex: 20,
       textAlign: "left",
@@ -263,30 +326,37 @@ function createStyles(
     panelLabel: {
       fontSize: 12 * scale,
       fontWeight: 700,
-      color: isDarkMode ? "#e5e7eb" : "#374151",
+      color: secondaryText,
     },
     panelDivider: {
       height: 1,
-      background: isDarkMode ? "#374151" : "#e5e7eb",
+      background: isContrast ? "#ffffff" : isDark ? "#374151" : "#e5e7eb",
       margin: "10px 0",
       border: "none",
     },
-    themeRow: {
+    themeOptions: {
       display: "flex",
-      justifyContent: "flex-start",
-      alignItems: "center",
+      flexDirection: "column",
+      gap: 8,
     },
-    themeButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "#111827" : "#f8fafc",
-      color: CLARA_PURPLE,
-      cursor: "pointer",
+    themeOption: {
       display: "flex",
       alignItems: "center",
-      justifyContent: "center",
+      gap: 10,
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 14,
+      border: softBorder,
+      background: iconBg,
+      color: secondaryText,
+      cursor: "pointer",
+      textAlign: "left",
+      fontSize: 14 * scale,
+      fontWeight: 600,
+    },
+    themeOptionActive: {
+      outline: `2px solid ${CLARA_PURPLE}`,
+      outlineOffset: 0,
     },
     textRow: {
       display: "flex",
@@ -297,8 +367,8 @@ function createStyles(
       width: 40,
       height: 40,
       borderRadius: 12,
-      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "#111827" : "#f8fafc",
+      border: iconBorder,
+      background: iconBg,
       color: CLARA_PURPLE,
       cursor: "pointer",
       display: "flex",
@@ -317,7 +387,7 @@ function createStyles(
     intro: {
       fontSize: 16 * scale,
       lineHeight: 1.5,
-      color: isDarkMode ? "#d1d5db" : "#5b4b73",
+      color: mutedText,
       margin: "0 0 18px 0",
     },
     label: {
@@ -325,7 +395,7 @@ function createStyles(
       fontSize: 14 * scale,
       fontWeight: 700,
       marginBottom: 10,
-      color: isDarkMode ? "#f3f4f6" : "#2d2d2d",
+      color: secondaryText,
       textAlign: "left",
     },
     textarea: {
@@ -333,14 +403,14 @@ function createStyles(
       minHeight: 120,
       padding: 14,
       borderRadius: 16,
-      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
+      border: borderColor,
       fontSize: 16 * scale,
       lineHeight: 1.5,
       boxSizing: "border-box",
       resize: "vertical",
       marginBottom: 14,
-      background: isDarkMode ? "#1f2937" : "#fcfcff",
-      color: isDarkMode ? "#f9fafb" : "#111827",
+      background: textFieldBg,
+      color: mainText,
       outline: "none",
     },
     primaryButton: {
@@ -348,8 +418,8 @@ function createStyles(
       padding: "14px 18px",
       borderRadius: 16,
       border: "none",
-      background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-      color: "#ffffff",
+      background: primaryBg,
+      color: primaryText,
       fontSize: 16 * scale,
       fontWeight: 700,
       cursor: "pointer",
@@ -364,7 +434,7 @@ function createStyles(
     examplesTitle: {
       fontSize: 14 * scale,
       fontWeight: 700,
-      color: isDarkMode ? "#e5e7eb" : "#374151",
+      color: secondaryText,
       marginBottom: 10,
     },
     chips: {
@@ -376,25 +446,25 @@ function createStyles(
     chip: {
       padding: "9px 12px",
       borderRadius: 999,
-      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
-      background: isDarkMode ? "#312e81" : "#eef2ff",
-      color: isDarkMode ? "#e0e7ff" : "#3730a3",
+      border: chipBorder,
+      background: chipBg,
+      color: chipText,
       cursor: "pointer",
       fontSize: 14 * scale,
     },
     answerBox: {
       marginTop: 20,
-      background: isDarkMode ? "#1f2937" : "#f8fafc",
+      background: softPanel,
       borderRadius: 18,
       padding: 18,
       textAlign: "left",
-      border: isDarkMode ? "1px solid #374151" : "1px solid #e5e7eb",
+      border: softBorder,
     },
     answerTitle: {
       margin: "0 0 8px 0",
       fontSize: 14 * scale,
       fontWeight: 700,
-      color: isDarkMode ? "#e5e7eb" : "#374151",
+      color: secondaryText,
     },
     actionsWrap: {
       marginTop: 12,
@@ -406,9 +476,9 @@ function createStyles(
       width: "100%",
       padding: "12px 16px",
       borderRadius: 16,
-      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
-      background: isDarkMode ? "#312e81" : "#eef2ff",
-      color: isDarkMode ? "#e0e7ff" : "#3730a3",
+      border: chipBorder,
+      background: chipBg,
+      color: chipText,
       fontSize: 15 * scale,
       fontWeight: 700,
       cursor: "pointer",
@@ -417,12 +487,12 @@ function createStyles(
       margin: "12px 0 4px 0",
       fontSize: 15 * scale,
       fontWeight: 600,
-      color: isDarkMode ? "#f3f4f6" : "#222222",
+      color: secondaryText,
     },
     replyParagraph: {
       margin: "0 0 12px 0",
       lineHeight: 1.6,
-      color: isDarkMode ? "#d1d5db" : "#111827",
+      color: mainText,
       fontSize: 16 * scale,
     },
   };
@@ -434,8 +504,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [systemDarkMode, setSystemDarkMode] = useState(false);
-  const [manualTheme, setManualTheme] = useState<ThemeMode>("system");
+  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [textSizeStep, setTextSizeStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -446,15 +515,15 @@ export default function App() {
     }
 
     try {
-      const savedTheme = window.localStorage.getItem("clara-theme");
+      const savedTheme = window.localStorage.getItem("clara-theme-mode");
       const savedTextSize = window.localStorage.getItem("clara-text-size");
 
       if (
-        savedTheme === "system" ||
         savedTheme === "light" ||
-        savedTheme === "dark"
+        savedTheme === "dark" ||
+        savedTheme === "contrast"
       ) {
-        setManualTheme(savedTheme);
+        setThemeMode(savedTheme);
       }
 
       if (savedTextSize !== null) {
@@ -474,11 +543,11 @@ export default function App() {
     }
 
     try {
-      window.localStorage.setItem("clara-theme", manualTheme);
+      window.localStorage.setItem("clara-theme-mode", themeMode);
     } catch {
       // ignore localStorage errors
     }
-  }, [manualTheme]);
+  }, [themeMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -491,28 +560,6 @@ export default function App() {
       // ignore localStorage errors
     }
   }, [textSizeStep]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const updateTheme = () => {
-      setSystemDarkMode(mediaQuery.matches);
-    };
-
-    updateTheme();
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateTheme);
-      return () => mediaQuery.removeEventListener("change", updateTheme);
-    }
-
-    mediaQuery.addListener(updateTheme);
-    return () => mediaQuery.removeListener(updateTheme);
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -562,13 +609,9 @@ export default function App() {
     };
   }, [menuOpen]);
 
-  const isDarkMode =
-    manualTheme === "dark" ||
-    (manualTheme === "system" && systemDarkMode);
-
   const styles = useMemo(
-    () => createStyles(isDarkMode, textSizeStep),
-    [isDarkMode, textSizeStep]
+    () => createStyles(themeMode, textSizeStep),
+    [themeMode, textSizeStep]
   );
 
   const showReadButton = useMemo(() => {
@@ -665,30 +708,14 @@ export default function App() {
     setTextSizeStep((prev) => clamp(prev - 1, -4, 10));
   }
 
-  function toggleTheme() {
-    if (manualTheme === "system") {
-      setManualTheme(systemDarkMode ? "light" : "dark");
-      return;
-    }
-
-    if (manualTheme === "light") {
-      setManualTheme("dark");
-      return;
-    }
-
-    setManualTheme("light");
-  }
-
-  function getThemeAriaLabel() {
-    if (isDarkMode) {
-      return "Mörkt läge är aktivt. Aktivera ljust läge.";
-    }
-
-    return "Ljust läge är aktivt. Aktivera mörkt läge.";
-  }
-
   function getTextSizeDescription() {
     return `Textstorlek nivå ${textSizeStep + 5} av 15.`;
+  }
+
+  function getThemeOptionAriaLabel(mode: ThemeMode) {
+    return `${getThemeLabel(mode)}. ${
+      themeMode === mode ? "Valt läge." : "Välj detta läge."
+    }`;
   }
 
   return (
@@ -746,16 +773,23 @@ export default function App() {
 
                   <div style={styles.panelLabel}>Tema</div>
 
-                  <div style={styles.themeRow}>
-                    <button
-                      type="button"
-                      onClick={toggleTheme}
-                      style={styles.themeButton}
-                      aria-label={getThemeAriaLabel()}
-                      title={getThemeAriaLabel()}
-                    >
-                      {isDarkMode ? <SunIcon size={24} /> : <MoonIcon size={24} />}
-                    </button>
+                  <div style={styles.themeOptions}>
+                    {(["light", "dark", "contrast"] as ThemeMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setThemeMode(mode)}
+                        style={{
+                          ...styles.themeOption,
+                          ...(themeMode === mode ? styles.themeOptionActive : {}),
+                        }}
+                        aria-label={getThemeOptionAriaLabel(mode)}
+                        title={getThemeLabel(mode)}
+                      >
+                        <ThemePreviewIcon mode={mode} size={20} />
+                        <span>{getThemeLabel(mode)}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
