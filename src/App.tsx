@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import claraLogo from "./clara.png";
 
@@ -149,6 +149,25 @@ function MoonIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function MenuIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 7H20M4 12H20M4 17H20"
+        stroke={CLARA_PURPLE}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function createStyles(
   isDarkMode: boolean,
   textSizeStep: number
@@ -175,19 +194,18 @@ function createStyles(
         ? "0 12px 32px rgba(0,0,0,0.35)"
         : "0 12px 32px rgba(0,0,0,0.10)",
       textAlign: "center",
+      position: "relative",
     },
     topBar: {
       display: "grid",
       gridTemplateColumns: "1fr auto 1fr",
       alignItems: "center",
-      gap: 12,
       marginBottom: 18,
     },
-    leftControls: {
+    topSpacer: {
       justifySelf: "start",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
+      width: 40,
+      height: 40,
     },
     centerLogo: {
       justifySelf: "center",
@@ -201,17 +219,15 @@ function createStyles(
         ? "0 8px 20px rgba(0,0,0,0.25)"
         : "0 6px 16px rgba(0,0,0,0.08)",
     },
-    rightControls: {
-      justifySelf: "end",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    },
     logo: {
       width: 150,
       display: "block",
     },
-    iconButton: {
+    menuWrap: {
+      justifySelf: "end",
+      position: "relative",
+    },
+    menuButton: {
       width: 40,
       height: 40,
       borderRadius: 14,
@@ -224,38 +240,79 @@ function createStyles(
       justifyContent: "center",
       backdropFilter: "blur(4px)",
     },
-    sizeButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
-      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
-      color: isDarkMode ? "#e0e7ff" : "#3730a3",
-      fontSize: 22 * scale,
+    menuPanel: {
+      position: "absolute",
+      top: 48,
+      right: 0,
+      width: 220,
+      background: isDarkMode ? "#1f2937" : "#ffffff",
+      border: isDarkMode ? "1px solid #374151" : "1px solid #e5e7eb",
+      borderRadius: 18,
+      boxShadow: isDarkMode
+        ? "0 18px 38px rgba(0,0,0,0.35)"
+        : "0 18px 38px rgba(0,0,0,0.12)",
+      padding: 14,
+      zIndex: 20,
+      textAlign: "left",
+    },
+    panelGroup: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    panelLabel: {
+      fontSize: 12 * scale,
       fontWeight: 700,
+      color: isDarkMode ? "#e5e7eb" : "#374151",
+    },
+    panelDivider: {
+      height: 1,
+      background: isDarkMode ? "#374151" : "#e5e7eb",
+      margin: "10px 0",
+      border: "none",
+    },
+    themeRow: {
+      display: "flex",
+      justifyContent: "flex-start",
+      alignItems: "center",
+    },
+    themeButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
+      background: isDarkMode ? "#111827" : "#f8fafc",
+      color: CLARA_PURPLE,
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      lineHeight: 1,
-      flexShrink: 0,
-      backdropFilter: "blur(4px)",
     },
-    sizePreview: {
-      width: 46,
-      height: 36,
+    textRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    },
+    sizeButton: {
+      width: 40,
+      height: 40,
       borderRadius: 12,
       border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
+      background: isDarkMode ? "#111827" : "#f8fafc",
       color: CLARA_PURPLE,
+      cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      boxSizing: "border-box",
-      fontWeight: 800,
-      fontSize: `${clamp(16 + textSizeStep * 4, 12, 60)}px`,
+      flexShrink: 0,
+      fontWeight: 700,
       lineHeight: 1,
-      backdropFilter: "blur(4px)",
+    },
+    smallT: {
+      fontSize: `${clamp(12 + textSizeStep * 2, 10, 24)}px`,
+    },
+    largeT: {
+      fontSize: `${clamp(20 + textSizeStep * 3, 14, 40)}px`,
     },
     intro: {
       fontSize: 16 * scale,
@@ -380,6 +437,8 @@ export default function App() {
   const [systemDarkMode, setSystemDarkMode] = useState(false);
   const [manualTheme, setManualTheme] = useState<ThemeMode>("system");
   const [textSizeStep, setTextSizeStep] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -472,6 +531,36 @@ export default function App() {
       window.speechSynthesis.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    function handleClickOutside(event: MouseEvent) {
+      if (!menuRef.current) {
+        return;
+      }
+
+      if (!menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen]);
 
   const isDarkMode =
     manualTheme === "dark" ||
@@ -606,50 +695,71 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.container}>
         <div style={styles.topBar}>
-          <div style={styles.leftControls}>
-            <button
-              type="button"
-              onClick={decreaseTextSize}
-              style={styles.sizeButton}
-              aria-label={`Minska textstorleken. ${getTextSizeDescription()}`}
-              title="Minska textstorleken"
-            >
-              −
-            </button>
-
-            <div
-              style={styles.sizePreview}
-              aria-live="polite"
-              aria-label={getTextSizeDescription()}
-            >
-              T
-            </div>
-
-            <button
-              type="button"
-              onClick={increaseTextSize}
-              style={styles.sizeButton}
-              aria-label={`Öka textstorleken. ${getTextSizeDescription()}`}
-              title="Öka textstorleken"
-            >
-              +
-            </button>
-          </div>
+          <div style={styles.topSpacer} />
 
           <div style={styles.centerLogo}>
             <img src={claraLogo} alt="Clara" style={styles.logo} />
           </div>
 
-          <div style={styles.rightControls}>
+          <div style={styles.menuWrap} ref={menuRef}>
             <button
               type="button"
-              onClick={toggleTheme}
-              style={styles.iconButton}
-              aria-label={getThemeAriaLabel()}
-              title={getThemeAriaLabel()}
+              onClick={() => setMenuOpen((prev) => !prev)}
+              style={styles.menuButton}
+              aria-label={
+                menuOpen ? "Stäng inställningsmenyn" : "Öppna inställningsmenyn"
+              }
+              aria-expanded={menuOpen}
+              title="Inställningar"
             >
-              {isDarkMode ? <SunIcon size={24} /> : <MoonIcon size={24} />}
+              <MenuIcon size={22} />
             </button>
+
+            {menuOpen && (
+              <div style={styles.menuPanel} role="menu" aria-label="Inställningar">
+                <div style={styles.panelGroup}>
+                  <div style={styles.panelLabel}>Textstorlek</div>
+
+                  <div style={styles.textRow}>
+                    <button
+                      type="button"
+                      onClick={decreaseTextSize}
+                      style={styles.sizeButton}
+                      aria-label={`Minska textstorleken. ${getTextSizeDescription()}`}
+                      title="Minska textstorleken"
+                    >
+                      <span style={styles.smallT}>T</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={increaseTextSize}
+                      style={styles.sizeButton}
+                      aria-label={`Öka textstorleken. ${getTextSizeDescription()}`}
+                      title="Öka textstorleken"
+                    >
+                      <span style={styles.largeT}>T</span>
+                    </button>
+                  </div>
+
+                  <hr style={styles.panelDivider} />
+
+                  <div style={styles.panelLabel}>Tema</div>
+
+                  <div style={styles.themeRow}>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      style={styles.themeButton}
+                      aria-label={getThemeAriaLabel()}
+                      title={getThemeAriaLabel()}
+                    >
+                      {isDarkMode ? <SunIcon size={24} /> : <MoonIcon size={24} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
