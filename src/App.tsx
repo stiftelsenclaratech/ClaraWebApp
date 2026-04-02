@@ -221,10 +221,10 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   replyHeading: {
-    margin: "16px 0 6px 0",
-    fontSize: 17,
-    fontWeight: 800,
-    color: "#111111",
+    margin: "12px 0 4px 0",
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#222222",
   },
   replyParagraph: {
     margin: "0 0 12px 0",
