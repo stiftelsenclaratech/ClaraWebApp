@@ -57,7 +57,7 @@ function getBestSwedishVoice(): SpeechSynthesisVoice | null {
   );
 }
 
-function formatReply(reply: string) {
+function formatReply(reply: string, styles: Record<string, CSSProperties>) {
   const headingLines = [
     "Problem",
     "Första steg",
@@ -98,141 +98,145 @@ function formatReply(reply: string) {
     });
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#f4f6fb",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    padding: "32px 16px",
-    fontFamily: "system-ui, sans-serif",
-  },
-  container: {
-    width: "100%",
-    maxWidth: 430,
-    background: "#ffffff",
-    borderRadius: 24,
-    padding: 24,
-    boxShadow: "0 12px 32px rgba(0,0,0,0.10)",
-    textAlign: "center",
-  },
-  logo: {
-    width: 170,
-    marginBottom: 12,
-  },
-  intro: {
-    fontSize: 16,
-    lineHeight: 1.5,
-    color: "#5b4b73",
-    margin: "0 0 18px 0",
-  },
-  label: {
-    display: "block",
-    fontSize: 14,
-    fontWeight: 700,
-    marginBottom: 10,
-    color: "#2d2d2d",
-    textAlign: "left",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 120,
-    padding: 14,
-    borderRadius: 16,
-    border: "1px solid #d8d8e2",
-    fontSize: 16,
-    lineHeight: 1.5,
-    boxSizing: "border-box",
-    resize: "vertical",
-    marginBottom: 14,
-    background: "#fcfcff",
-    color: "#111827",
-    outline: "none",
-  },
-  primaryButton: {
-    width: "100%",
-    padding: "14px 18px",
-    borderRadius: 16,
-    border: "none",
-    background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7,
-    cursor: "not-allowed",
-  },
-  examplesWrap: {
-    marginTop: 18,
-  },
-  examplesTitle: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#374151",
-    marginBottom: 10,
-  },
-  chips: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "center",
-  },
-  chip: {
-    padding: "9px 12px",
-    borderRadius: 999,
-    border: "1px solid #c7d2fe",
-    background: "#eef2ff",
-    color: "#3730a3",
-    cursor: "pointer",
-    fontSize: 14,
-  },
-  answerBox: {
-    marginTop: 20,
-    background: "#f8fafc",
-    borderRadius: 18,
-    padding: 18,
-    textAlign: "left",
-    border: "1px solid #e5e7eb",
-  },
-  answerTitle: {
-    margin: "0 0 8px 0",
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#374151",
-  },
-  actionsWrap: {
-    marginTop: 12,
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  secondaryButton: {
-    width: "100%",
-    padding: "12px 16px",
-    borderRadius: 16,
-    border: "1px solid #c7d2fe",
-    background: "#eef2ff",
-    color: "#3730a3",
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  replyHeading: {
-    margin: "12px 0 4px 0",
-    fontSize: 15,
-    fontWeight: 600,
-    color: "#222222",
-  },
-  replyParagraph: {
-    margin: "0 0 12px 0",
-    lineHeight: 1.6,
-    color: "#111827",
-    fontSize: 16,
-  },
-};
+function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
+  return {
+    page: {
+      minHeight: "100vh",
+      background: isDarkMode ? "#0f172a" : "#f4f6fb",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "flex-start",
+      padding: "32px 16px",
+      fontFamily: "system-ui, sans-serif",
+    },
+    container: {
+      width: "100%",
+      maxWidth: 430,
+      background: isDarkMode ? "#111827" : "#ffffff",
+      borderRadius: 24,
+      padding: 24,
+      boxShadow: isDarkMode
+        ? "0 12px 32px rgba(0,0,0,0.35)"
+        : "0 12px 32px rgba(0,0,0,0.10)",
+      textAlign: "center",
+    },
+    logo: {
+      width: 170,
+      marginBottom: 12,
+    },
+    intro: {
+      fontSize: 16,
+      lineHeight: 1.5,
+      color: isDarkMode ? "#d1d5db" : "#5b4b73",
+      margin: "0 0 18px 0",
+    },
+    label: {
+      display: "block",
+      fontSize: 14,
+      fontWeight: 700,
+      marginBottom: 10,
+      color: isDarkMode ? "#f3f4f6" : "#2d2d2d",
+      textAlign: "left",
+    },
+    textarea: {
+      width: "100%",
+      minHeight: 120,
+      padding: 14,
+      borderRadius: 16,
+      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
+      fontSize: 16,
+      lineHeight: 1.5,
+      boxSizing: "border-box",
+      resize: "vertical",
+      marginBottom: 14,
+      background: isDarkMode ? "#1f2937" : "#fcfcff",
+      color: isDarkMode ? "#f9fafb" : "#111827",
+      outline: "none",
+    },
+    primaryButton: {
+      width: "100%",
+      padding: "14px 18px",
+      borderRadius: 16,
+      border: "none",
+      background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+      color: "#ffffff",
+      fontSize: 16,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    primaryButtonDisabled: {
+      opacity: 0.7,
+      cursor: "not-allowed",
+    },
+    examplesWrap: {
+      marginTop: 18,
+    },
+    examplesTitle: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: isDarkMode ? "#e5e7eb" : "#374151",
+      marginBottom: 10,
+    },
+    chips: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      justifyContent: "center",
+    },
+    chip: {
+      padding: "9px 12px",
+      borderRadius: 999,
+      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
+      background: isDarkMode ? "#312e81" : "#eef2ff",
+      color: isDarkMode ? "#e0e7ff" : "#3730a3",
+      cursor: "pointer",
+      fontSize: 14,
+    },
+    answerBox: {
+      marginTop: 20,
+      background: isDarkMode ? "#1f2937" : "#f8fafc",
+      borderRadius: 18,
+      padding: 18,
+      textAlign: "left",
+      border: isDarkMode ? "1px solid #374151" : "1px solid #e5e7eb",
+    },
+    answerTitle: {
+      margin: "0 0 8px 0",
+      fontSize: 14,
+      fontWeight: 700,
+      color: isDarkMode ? "#e5e7eb" : "#374151",
+    },
+    actionsWrap: {
+      marginTop: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    secondaryButton: {
+      width: "100%",
+      padding: "12px 16px",
+      borderRadius: 16,
+      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
+      background: isDarkMode ? "#312e81" : "#eef2ff",
+      color: isDarkMode ? "#e0e7ff" : "#3730a3",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    replyHeading: {
+      margin: "12px 0 4px 0",
+      fontSize: 15,
+      fontWeight: 600,
+      color: isDarkMode ? "#f3f4f6" : "#222222",
+    },
+    replyParagraph: {
+      margin: "0 0 12px 0",
+      lineHeight: 1.6,
+      color: isDarkMode ? "#d1d5db" : "#111827",
+      fontSize: 16,
+    },
+  };
+}
 
 export default function App() {
   const [problem, setProblem] = useState("");
@@ -240,6 +244,26 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateTheme = () => {
+      setIsDarkMode(mediaQuery.matches);
+    };
+
+    updateTheme();
+
+    mediaQuery.addEventListener("change", updateTheme);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateTheme);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -258,6 +282,8 @@ export default function App() {
       window.speechSynthesis.cancel();
     };
   }, []);
+
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
 
   const showReadButton = useMemo(() => {
     return !loading && reply !== "" && reply !== INITIAL_REPLY && reply !== THINKING_REPLY;
@@ -401,7 +427,7 @@ export default function App() {
 
         <div style={styles.answerBox} aria-live="polite">
           <p style={styles.answerTitle}>Svar</p>
-          <div>{formatReply(reply)}</div>
+          <div>{formatReply(reply, styles)}</div>
         </div>
 
         <div style={styles.actionsWrap}>
