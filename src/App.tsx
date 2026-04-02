@@ -63,7 +63,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function getFontScale(step: number) {
-  return 1 + step * 0.06;
+  return 1 + step * 0.12;
 }
 
 function formatReply(
@@ -110,7 +110,7 @@ function formatReply(
     });
 }
 
-function SunIcon({ size = 20 }: { size?: number }) {
+function SunIcon({ size = 22 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -130,7 +130,7 @@ function SunIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-function MoonIcon({ size = 20 }: { size?: number }) {
+function MoonIcon({ size = 22 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -165,7 +165,7 @@ function createStyles(
     },
     container: {
       width: "100%",
-      maxWidth: 460,
+      maxWidth: 480,
       background: isDarkMode ? "#111827" : "#ffffff",
       borderRadius: 24,
       padding: 24,
@@ -174,12 +174,12 @@ function createStyles(
         : "0 12px 32px rgba(0,0,0,0.10)",
       textAlign: "center",
     },
-    topBar: {
+    logoSection: {
       display: "flex",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
+      flexDirection: "column",
+      alignItems: "center",
       gap: 12,
-      marginBottom: 12,
+      marginBottom: 16,
     },
     logoWrap: {
       display: "inline-flex",
@@ -191,24 +191,28 @@ function createStyles(
       boxShadow: isDarkMode
         ? "0 8px 20px rgba(0,0,0,0.25)"
         : "0 6px 16px rgba(0,0,0,0.08)",
-      flexShrink: 0,
     },
     logo: {
       width: 150,
       display: "block",
     },
-    controlsWrap: {
+    controlsRow: {
       display: "flex",
-      flexDirection: "column",
-      gap: 8,
-      alignItems: "stretch",
-      minWidth: 136,
+      justifyContent: "center",
+      gap: 10,
+      width: "100%",
+      flexWrap: "wrap",
     },
-    controlGroup: {
+    controlCard: {
       display: "flex",
       flexDirection: "column",
-      gap: 4,
-      textAlign: "left",
+      gap: 6,
+      alignItems: "center",
+      background: isDarkMode ? "#1f2937" : "#f8fafc",
+      border: isDarkMode ? "1px solid #374151" : "1px solid #e5e7eb",
+      borderRadius: 16,
+      padding: "10px 12px",
+      minWidth: 140,
     },
     controlLabel: {
       fontSize: 12 * scale,
@@ -217,30 +221,31 @@ function createStyles(
       lineHeight: 1.2,
     },
     iconButton: {
-      width: "100%",
-      height: 42,
-      borderRadius: 12,
-      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
-      background: isDarkMode ? "#312e81" : "#eef2ff",
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      border: "1px solid #d8d8e2",
+      background: "#ffffff",
       color: CLARA_PURPLE,
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
+      boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
     },
     textSizeRow: {
       display: "flex",
       alignItems: "center",
-      gap: 6,
+      gap: 8,
     },
     sizeButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
+      width: 40,
+      height: 40,
+      borderRadius: 14,
       border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
       background: isDarkMode ? "#312e81" : "#eef2ff",
       color: isDarkMode ? "#e0e7ff" : "#3730a3",
-      fontSize: 18 * scale,
+      fontSize: 22 * scale,
       fontWeight: 700,
       cursor: "pointer",
       display: "flex",
@@ -250,20 +255,20 @@ function createStyles(
       flexShrink: 0,
     },
     sizePreview: {
-      flex: 1,
-      minWidth: 0,
-      height: 36,
-      borderRadius: 12,
+      width: 64,
+      height: 40,
+      borderRadius: 14,
       border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      background: isDarkMode ? "#1f2937" : "#fcfcff",
+      background: isDarkMode ? "#111827" : "#ffffff",
       color: CLARA_PURPLE,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       boxSizing: "border-box",
       fontWeight: 800,
-      fontSize: `${clamp(16 + textSizeStep * 2, 12, 32)}px`,
+      fontSize: `${clamp(16 + textSizeStep * 4, 12, 52)}px`,
       lineHeight: 1,
+      boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
     },
     intro: {
       fontSize: 16 * scale,
@@ -386,7 +391,9 @@ export default function App() {
   const [showExamples, setShowExamples] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [systemDarkMode, setSystemDarkMode] = useState(false);
-  const [manualDarkMode, setManualDarkMode] = useState(false);
+  const [manualTheme, setManualTheme] = useState<"system" | "light" | "dark">(
+    "system"
+  );
   const [textSizeStep, setTextSizeStep] = useState(0);
 
   useEffect(() => {
@@ -429,7 +436,10 @@ export default function App() {
     };
   }, []);
 
-  const isDarkMode = manualDarkMode || systemDarkMode;
+  const isDarkMode =
+    manualTheme === "dark" ||
+    (manualTheme === "system" && systemDarkMode);
+
   const styles = useMemo(
     () => createStyles(isDarkMode, textSizeStep),
     [isDarkMode, textSizeStep]
@@ -522,49 +532,79 @@ export default function App() {
   }
 
   function increaseTextSize() {
-    setTextSizeStep((prev) => clamp(prev + 1, -4, 6));
+    setTextSizeStep((prev) => clamp(prev + 1, -4, 10));
   }
 
   function decreaseTextSize() {
-    setTextSizeStep((prev) => clamp(prev - 1, -4, 6));
+    setTextSizeStep((prev) => clamp(prev - 1, -4, 10));
+  }
+
+  function toggleTheme() {
+    if (manualTheme === "system") {
+      setManualTheme(systemDarkMode ? "light" : "dark");
+      return;
+    }
+
+    if (manualTheme === "light") {
+      setManualTheme("dark");
+      return;
+    }
+
+    setManualTheme("light");
+  }
+
+  function getThemeAriaLabel() {
+    if (isDarkMode) {
+      return "Mörkt läge är aktivt. Aktivera ljust läge.";
+    }
+
+    return "Ljust läge är aktivt. Aktivera mörkt läge.";
+  }
+
+  function getTextSizeDescription() {
+    return `Textstorlek nivå ${textSizeStep + 5} av 15.`;
   }
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.topBar}>
+        <div style={styles.logoSection}>
           <div style={styles.logoWrap}>
             <img src={claraLogo} alt="Clara" style={styles.logo} />
           </div>
 
-          <div style={styles.controlsWrap}>
-            <div style={styles.controlGroup}>
+          <div style={styles.controlsRow}>
+            <div style={styles.controlCard}>
               <div style={styles.controlLabel}>Tema</div>
               <button
                 type="button"
-                onClick={() => setManualDarkMode((prev) => !prev)}
+                onClick={toggleTheme}
                 style={styles.iconButton}
-                aria-label={
-                  manualDarkMode ? "Byt till ljust läge" : "Byt till mörkt läge"
-                }
+                aria-label={getThemeAriaLabel()}
+                title={getThemeAriaLabel()}
               >
-                {isDarkMode ? <SunIcon size={22} /> : <MoonIcon size={22} />}
+                {isDarkMode ? <SunIcon size={24} /> : <MoonIcon size={24} />}
               </button>
             </div>
 
-            <div style={styles.controlGroup}>
-              <div style={styles.controlLabel}>Text</div>
+            <div style={styles.controlCard}>
+              <div style={styles.controlLabel}>Textstorlek</div>
               <div style={styles.textSizeRow}>
                 <button
                   type="button"
                   onClick={decreaseTextSize}
                   style={styles.sizeButton}
-                  aria-label="Minska textstorleken"
+                  aria-label={`Minska textstorleken. ${getTextSizeDescription()}`}
+                  title="Minska textstorleken"
                 >
                   −
                 </button>
 
-                <div style={styles.sizePreview} aria-live="polite">
+                <div
+                  style={styles.sizePreview}
+                  aria-live="polite"
+                  aria-label={getTextSizeDescription()}
+                >
                   T
                 </div>
 
@@ -572,7 +612,8 @@ export default function App() {
                   type="button"
                   onClick={increaseTextSize}
                   style={styles.sizeButton}
-                  aria-label="Öka textstorleken"
+                  aria-label={`Öka textstorleken. ${getTextSizeDescription()}`}
+                  title="Öka textstorleken"
                 >
                   +
                 </button>
@@ -607,6 +648,7 @@ export default function App() {
             ...(loading ? styles.primaryButtonDisabled : {}),
           }}
           aria-label={loading ? "Clara tänker" : "Få hjälp"}
+          title="Få hjälp"
         >
           {loading ? "Clara tänker..." : "Få hjälp"}
         </button>
@@ -621,7 +663,8 @@ export default function App() {
                   type="button"
                   onClick={() => void handleExampleClick(example)}
                   style={styles.chip}
-                  aria-label={`Exempel: ${example}`}
+                  aria-label={`Exempel. ${example}`}
+                  title={example}
                 >
                   {example}
                 </button>
@@ -641,7 +684,12 @@ export default function App() {
               type="button"
               onClick={handleToggleSpeech}
               style={styles.secondaryButton}
-              aria-label={isSpeaking ? "Sluta läs upp" : "Läs upp svaret"}
+              aria-label={
+                isSpeaking
+                  ? "Sluta läsa upp svaret"
+                  : "Läs upp svaret med talsyntes"
+              }
+              title={isSpeaking ? "Sluta läsa upp" : "Läs upp svaret"}
             >
               {isSpeaking ? "Sluta läs upp" : "Läs upp svaret"}
             </button>
@@ -653,6 +701,7 @@ export default function App() {
               onClick={handleShowExamplesAgain}
               style={styles.secondaryButton}
               aria-label="Visa exempel igen"
+              title="Visa exempel igen"
             >
               Visa exempel igen
             </button>
