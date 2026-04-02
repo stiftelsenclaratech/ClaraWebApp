@@ -57,7 +57,18 @@ function getBestSwedishVoice(): SpeechSynthesisVoice | null {
   );
 }
 
-function formatReply(reply: string, styles: Record<string, CSSProperties>) {
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getFontScale(step: number) {
+  return 1 + step * 0.08;
+}
+
+function formatReply(
+  reply: string,
+  styles: Record<string, CSSProperties>
+) {
   const headingLines = [
     "Problem",
     "Första steg",
@@ -98,7 +109,12 @@ function formatReply(reply: string, styles: Record<string, CSSProperties>) {
     });
 }
 
-function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
+function createStyles(
+  isDarkMode: boolean,
+  textSizeStep: number
+): Record<string, CSSProperties> {
+  const scale = getFontScale(textSizeStep);
+
   return {
     page: {
       minHeight: "100vh",
@@ -111,7 +127,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
     },
     container: {
       width: "100%",
-      maxWidth: 430,
+      maxWidth: 460,
       background: isDarkMode ? "#111827" : "#ffffff",
       borderRadius: 24,
       padding: 24,
@@ -120,6 +136,13 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
         : "0 12px 32px rgba(0,0,0,0.10)",
       textAlign: "center",
     },
+    topBar: {
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 12,
+    },
     logoWrap: {
       display: "inline-flex",
       justifyContent: "center",
@@ -127,24 +150,91 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       background: "#ffffff",
       borderRadius: 18,
       padding: "10px 16px",
-      marginBottom: 12,
       boxShadow: isDarkMode
         ? "0 8px 20px rgba(0,0,0,0.25)"
         : "0 6px 16px rgba(0,0,0,0.08)",
+      flexShrink: 0,
     },
     logo: {
       width: 150,
       display: "block",
     },
+    controlsWrap: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      alignItems: "stretch",
+      minWidth: 132,
+    },
+    controlGroup: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 4,
+      textAlign: "left",
+    },
+    controlLabel: {
+      fontSize: 12 * scale,
+      fontWeight: 700,
+      color: isDarkMode ? "#e5e7eb" : "#374151",
+      lineHeight: 1.2,
+    },
+    darkModeButton: {
+      width: "100%",
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
+      background: isDarkMode ? "#312e81" : "#eef2ff",
+      color: isDarkMode ? "#e0e7ff" : "#3730a3",
+      fontSize: 13 * scale,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    textSizeRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+    },
+    sizeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
+      background: isDarkMode ? "#312e81" : "#eef2ff",
+      color: isDarkMode ? "#e0e7ff" : "#3730a3",
+      fontSize: 18 * scale,
+      fontWeight: 700,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      lineHeight: 1,
+      flexShrink: 0,
+    },
+    sizeValue: {
+      flex: 1,
+      minWidth: 0,
+      height: 36,
+      borderRadius: 12,
+      border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
+      background: isDarkMode ? "#1f2937" : "#fcfcff",
+      color: isDarkMode ? "#f9fafb" : "#111827",
+      fontSize: 13 * scale,
+      fontWeight: 700,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 8px",
+      boxSizing: "border-box",
+    },
     intro: {
-      fontSize: 16,
+      fontSize: 16 * scale,
       lineHeight: 1.5,
       color: isDarkMode ? "#d1d5db" : "#5b4b73",
       margin: "0 0 18px 0",
     },
     label: {
       display: "block",
-      fontSize: 14,
+      fontSize: 14 * scale,
       fontWeight: 700,
       marginBottom: 10,
       color: isDarkMode ? "#f3f4f6" : "#2d2d2d",
@@ -156,7 +246,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       padding: 14,
       borderRadius: 16,
       border: isDarkMode ? "1px solid #374151" : "1px solid #d8d8e2",
-      fontSize: 16,
+      fontSize: 16 * scale,
       lineHeight: 1.5,
       boxSizing: "border-box",
       resize: "vertical",
@@ -172,7 +262,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       border: "none",
       background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
       color: "#ffffff",
-      fontSize: 16,
+      fontSize: 16 * scale,
       fontWeight: 700,
       cursor: "pointer",
     },
@@ -184,7 +274,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       marginTop: 18,
     },
     examplesTitle: {
-      fontSize: 14,
+      fontSize: 14 * scale,
       fontWeight: 700,
       color: isDarkMode ? "#e5e7eb" : "#374151",
       marginBottom: 10,
@@ -202,7 +292,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       background: isDarkMode ? "#312e81" : "#eef2ff",
       color: isDarkMode ? "#e0e7ff" : "#3730a3",
       cursor: "pointer",
-      fontSize: 14,
+      fontSize: 14 * scale,
     },
     answerBox: {
       marginTop: 20,
@@ -214,7 +304,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
     },
     answerTitle: {
       margin: "0 0 8px 0",
-      fontSize: 14,
+      fontSize: 14 * scale,
       fontWeight: 700,
       color: isDarkMode ? "#e5e7eb" : "#374151",
     },
@@ -231,13 +321,13 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       border: isDarkMode ? "1px solid #4338ca" : "1px solid #c7d2fe",
       background: isDarkMode ? "#312e81" : "#eef2ff",
       color: isDarkMode ? "#e0e7ff" : "#3730a3",
-      fontSize: 15,
+      fontSize: 15 * scale,
       fontWeight: 700,
       cursor: "pointer",
     },
     replyHeading: {
       margin: "12px 0 4px 0",
-      fontSize: 15,
+      fontSize: 15 * scale,
       fontWeight: 600,
       color: isDarkMode ? "#f3f4f6" : "#222222",
     },
@@ -245,7 +335,7 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
       margin: "0 0 12px 0",
       lineHeight: 1.6,
       color: isDarkMode ? "#d1d5db" : "#111827",
-      fontSize: 16,
+      fontSize: 16 * scale,
     },
   };
 }
@@ -256,7 +346,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [systemDarkMode, setSystemDarkMode] = useState(false);
+  const [manualDarkMode, setManualDarkMode] = useState(false);
+  const [textSizeStep, setTextSizeStep] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -266,7 +358,7 @@ export default function App() {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
     const updateTheme = () => {
-      setIsDarkMode(mediaQuery.matches);
+      setSystemDarkMode(mediaQuery.matches);
     };
 
     updateTheme();
@@ -298,7 +390,11 @@ export default function App() {
     };
   }, []);
 
-  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
+  const isDarkMode = manualDarkMode || systemDarkMode;
+  const styles = useMemo(
+    () => createStyles(isDarkMode, textSizeStep),
+    [isDarkMode, textSizeStep]
+  );
 
   const showReadButton = useMemo(() => {
     return !loading && reply !== "" && reply !== INITIAL_REPLY && reply !== THINKING_REPLY;
@@ -386,11 +482,74 @@ export default function App() {
     setIsSpeaking(true);
   }
 
+  function increaseTextSize() {
+    setTextSizeStep((prev) => clamp(prev + 1, -2, 4));
+  }
+
+  function decreaseTextSize() {
+    setTextSizeStep((prev) => clamp(prev - 1, -2, 4));
+  }
+
+  function getTextSizeLabel() {
+    if (textSizeStep <= -2) return "Mycket liten";
+    if (textSizeStep === -1) return "Liten";
+    if (textSizeStep === 0) return "Normal";
+    if (textSizeStep === 1) return "Lite större";
+    if (textSizeStep === 2) return "Stor";
+    if (textSizeStep === 3) return "Mycket stor";
+    return "Extra stor";
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.logoWrap}>
-          <img src={claraLogo} alt="Clara" style={styles.logo} />
+        <div style={styles.topBar}>
+          <div style={styles.logoWrap}>
+            <img src={claraLogo} alt="Clara" style={styles.logo} />
+          </div>
+
+          <div style={styles.controlsWrap}>
+            <div style={styles.controlGroup}>
+              <div style={styles.controlLabel}>Dark mode</div>
+              <button
+                type="button"
+                onClick={() => setManualDarkMode((prev) => !prev)}
+                style={styles.darkModeButton}
+                aria-label={
+                  manualDarkMode ? "Stäng av dark mode" : "Slå på dark mode"
+                }
+              >
+                {manualDarkMode ? "På" : "Av"}
+              </button>
+            </div>
+
+            <div style={styles.controlGroup}>
+              <div style={styles.controlLabel}>Textstorlek</div>
+              <div style={styles.textSizeRow}>
+                <button
+                  type="button"
+                  onClick={decreaseTextSize}
+                  style={styles.sizeButton}
+                  aria-label="Minska textstorleken"
+                >
+                  −
+                </button>
+
+                <div style={styles.sizeValue} aria-live="polite">
+                  {getTextSizeLabel()}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={increaseTextSize}
+                  style={styles.sizeButton}
+                  aria-label="Öka textstorleken"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <p style={styles.intro}>
