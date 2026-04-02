@@ -12,7 +12,7 @@ const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
 const THINKING_REPLY = "Clara tänker...";
 const CLARA_PURPLE = "#6d28d9";
 
-type ThemeMode = "light" | "dark" | "contrast";
+type ThemeMode = "system" | "light" | "dark" | "contrast";
 
 async function getClaraReplyFromAPI(input: string): Promise<string> {
   const trimmedInput = input.trim();
@@ -183,6 +183,34 @@ function ContrastIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+function AutoThemeIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="4"
+        y="5"
+        width="16"
+        height="12"
+        rx="2"
+        stroke={CLARA_PURPLE}
+        strokeWidth="2"
+      />
+      <path
+        d="M9 20H15"
+        stroke={CLARA_PURPLE}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function ThemePreviewIcon({
   mode,
   size = 20,
@@ -198,22 +226,27 @@ function ThemePreviewIcon({
     return <ContrastIcon size={size} />;
   }
 
+  if (mode === "system") {
+    return <AutoThemeIcon size={size} />;
+  }
+
   return <SunIcon size={size} />;
 }
 
 function getThemeLabel(mode: ThemeMode) {
+  if (mode === "system") return "Följ systemet";
   if (mode === "dark") return "Mörkt läge";
   if (mode === "contrast") return "Hög kontrast";
   return "Ljust läge";
 }
 
 function createStyles(
-  themeMode: ThemeMode,
+  activeTheme: Exclude<ThemeMode, "system"> | "light" | "dark" | "contrast",
   textSizeStep: number
 ): Record<string, CSSProperties> {
   const scale = getFontScale(textSizeStep);
-  const isDark = themeMode === "dark";
-  const isContrast = themeMode === "contrast";
+  const isDark = activeTheme === "dark";
+  const isContrast = activeTheme === "contrast";
 
   const pageBackground = isContrast ? "#000000" : isDark ? "#0f172a" : "#f4f6fb";
   const containerBackground = isContrast ? "#000000" : isDark ? "#111827" : "#ffffff";
@@ -504,7 +537,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
+  const [systemDarkMode, setSystemDarkMode] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>("system");
   const [textSizeStep, setTextSizeStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -519,6 +553,7 @@ export default function App() {
       const savedTextSize = window.localStorage.getItem("clara-text-size");
 
       if (
+        savedTheme === "system" ||
         savedTheme === "light" ||
         savedTheme === "dark" ||
         savedTheme === "contrast"
@@ -560,6 +595,28 @@ export default function App() {
       // ignore localStorage errors
     }
   }, [textSizeStep]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const updateTheme = () => {
+      setSystemDarkMode(mediaQuery.matches);
+    };
+
+    updateTheme();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateTheme);
+      return () => mediaQuery.removeEventListener("change", updateTheme);
+    }
+
+    mediaQuery.addListener(updateTheme);
+    return () => mediaQuery.removeListener(updateTheme);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -609,9 +666,12 @@ export default function App() {
     };
   }, [menuOpen]);
 
+  const resolvedTheme: Exclude<ThemeMode, "system"> =
+    themeMode === "system" ? (systemDarkMode ? "dark" : "light") : themeMode;
+
   const styles = useMemo(
-    () => createStyles(themeMode, textSizeStep),
-    [themeMode, textSizeStep]
+    () => createStyles(resolvedTheme, textSizeStep),
+    [resolvedTheme, textSizeStep]
   );
 
   const showReadButton = useMemo(() => {
@@ -774,22 +834,24 @@ export default function App() {
                   <div style={styles.panelLabel}>Tema</div>
 
                   <div style={styles.themeOptions}>
-                    {(["light", "dark", "contrast"] as ThemeMode[]).map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setThemeMode(mode)}
-                        style={{
-                          ...styles.themeOption,
-                          ...(themeMode === mode ? styles.themeOptionActive : {}),
-                        }}
-                        aria-label={getThemeOptionAriaLabel(mode)}
-                        title={getThemeLabel(mode)}
-                      >
-                        <ThemePreviewIcon mode={mode} size={20} />
-                        <span>{getThemeLabel(mode)}</span>
-                      </button>
-                    ))}
+                    {(["system", "light", "dark", "contrast"] as ThemeMode[]).map(
+                      (mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setThemeMode(mode)}
+                          style={{
+                            ...styles.themeOption,
+                            ...(themeMode === mode ? styles.themeOptionActive : {}),
+                          }}
+                          aria-label={getThemeOptionAriaLabel(mode)}
+                          title={getThemeLabel(mode)}
+                        >
+                          <ThemePreviewIcon mode={mode} size={20} />
+                          <span>{getThemeLabel(mode)}</span>
+                        </button>
+                      )
+                    )}
                   </div>
                 </div>
               </div>
@@ -798,7 +860,7 @@ export default function App() {
         </div>
 
         <p style={styles.intro}>
-          Beskriv ditt problem så får du ett tydligt teknikförslag.
+          Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik som kan hjälpa.
         </p>
 
         <label htmlFor="clara-problem" style={styles.label}>
