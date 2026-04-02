@@ -48,6 +48,11 @@ function getBestSwedishVoice(): SpeechSynthesisVoice | null {
     return null;
   }
 
+  console.log(
+    "Available voices:",
+    voices.map((voice) => `${voice.name} | ${voice.lang}`)
+  );
+
   return (
     voices.find((voice) => voice.lang === "sv-FI") ||
     voices.find((voice) => voice.lang === "sv-SE") ||
@@ -61,22 +66,26 @@ function speakText(text: string) {
     return;
   }
 
+  const synth = window.speechSynthesis;
   const utterance = new SpeechSynthesisUtterance(text);
   const bestVoice = getBestSwedishVoice();
 
-  if (bestVoice) {
-    utterance.voice = bestVoice;
-    utterance.lang = bestVoice.lang;
-  } else {
-    utterance.lang = "sv-SE";
-  }
-
+  utterance.text = text;
+  utterance.lang = "sv-SE";
   utterance.rate = 1;
   utterance.pitch = 1;
   utterance.volume = 1;
 
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  if (bestVoice) {
+    utterance.voice = bestVoice;
+    utterance.lang = bestVoice.lang;
+    console.log("Using voice:", bestVoice.name, bestVoice.lang);
+  } else {
+    console.log("No Swedish voice found, falling back to sv-SE");
+  }
+
+  synth.cancel();
+  synth.speak(utterance);
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -222,7 +231,11 @@ export default function App() {
     }
 
     const loadVoices = () => {
-      window.speechSynthesis.getVoices();
+      const voices = window.speechSynthesis.getVoices();
+      console.log(
+        "Voices loaded:",
+        voices.map((voice) => `${voice.name} | ${voice.lang}`)
+      );
     };
 
     loadVoices();
