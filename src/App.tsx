@@ -120,9 +120,21 @@ function createStyles(isDarkMode: boolean): Record<string, CSSProperties> {
         : "0 12px 32px rgba(0,0,0,0.10)",
       textAlign: "center",
     },
-    logo: {
-      width: 170,
+    logoWrap: {
+      display: "inline-flex",
+      justifyContent: "center",
+      alignItems: "center",
+      background: "#ffffff",
+      borderRadius: 18,
+      padding: "10px 16px",
       marginBottom: 12,
+      boxShadow: isDarkMode
+        ? "0 8px 20px rgba(0,0,0,0.25)"
+        : "0 6px 16px rgba(0,0,0,0.08)",
+    },
+    logo: {
+      width: 150,
+      display: "block",
     },
     intro: {
       fontSize: 16,
@@ -252,17 +264,20 @@ export default function App() {
     }
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
     const updateTheme = () => {
       setIsDarkMode(mediaQuery.matches);
     };
 
     updateTheme();
 
-    mediaQuery.addEventListener("change", updateTheme);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateTheme);
+      return () => mediaQuery.removeEventListener("change", updateTheme);
+    }
 
-    return () => {
-      mediaQuery.removeEventListener("change", updateTheme);
-    };
+    mediaQuery.addListener(updateTheme);
+    return () => mediaQuery.removeListener(updateTheme);
   }, []);
 
   useEffect(() => {
@@ -374,7 +389,9 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <img src={claraLogo} alt="Clara" style={styles.logo} />
+        <div style={styles.logoWrap}>
+          <img src={claraLogo} alt="Clara" style={styles.logo} />
+        </div>
 
         <p style={styles.intro}>
           Beskriv ditt problem så får du ett tydligt teknikförslag.
