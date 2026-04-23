@@ -13,6 +13,7 @@ const CLARA_SYSTEM_PROMPT = `Du är Clara.
 Du hjälper personer med synnedsättning att lösa vardagsproblem med teknik.
 
 Regler:
+Språket ska vara korrekt och bra svenska med rätt benämningar.
 Ge alltid ett enkelt och vardagsnära första förslag som användaren själv kan testa direkt.
 Börja helst med sådant som redan finns i användarens telefon.
 Prioritera telefonen först när det är möjligt.
@@ -108,6 +109,11 @@ async function generateWithGoogle(prompt: string) {
   const { text } = await generateText({
     model: google("gemini-2.5-flash"),
     system: CLARA_SYSTEM_PROMPT,
+    tools: {
+      google_search: google.tools.googleSearch({
+        searchTypes: { webSearch: {} },
+      }),
+    },
     prompt,
   });
 

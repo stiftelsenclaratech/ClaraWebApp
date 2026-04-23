@@ -1425,21 +1425,7 @@ export default function App() {
                           >
                             {isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
                           </button>
-
-                          <button
-                            type="button"
-                            onClick={() => void handleShareOrSave(message)}
-                            style={styles.secondaryButton}
-                            aria-label="Dela eller spara senaste svaret"
-                            title="Dela eller spara svaret"
-                          >
-                            Dela eller spara
-                          </button>
                         </div>
-
-                        {actionFeedback.messageId === message.id && actionFeedback.text && (
-                          <p style={styles.messageFeedback}>{actionFeedback.text}</p>
-                        )}
                       </>
                     )}
                   </div>
@@ -1483,6 +1469,25 @@ export default function App() {
                 >
                   {loading ? "Clara tänker..." : "Skicka fråga"}
                 </button>
+
+                {latestAssistantMessage && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleShareOrSave(latestAssistantMessage)}
+                      style={styles.secondaryButton}
+                      aria-label="Dela eller spara senaste svaret"
+                      title="Dela eller spara svaret"
+                    >
+                      Dela eller spara
+                    </button>
+
+                    {actionFeedback.messageId === latestAssistantMessage.id &&
+                      actionFeedback.text && (
+                        <p style={styles.messageFeedback}>{actionFeedback.text}</p>
+                      )}
+                  </>
+                )}
 
                 <button
                   type="button"
