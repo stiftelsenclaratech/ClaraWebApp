@@ -284,10 +284,19 @@ function formatReply(
   const lines = reply.split("\n").map((line) => line.trim()).filter(Boolean);
   const blocks: Array<
     | { type: "heading"; value: string }
+    | { type: "subheading"; value: string }
     | { type: "paragraph"; value: string }
     | { type: "list"; items: string[]; ordered: boolean }
   > = [];
   let previousLineWasListItem = false;
+  const subheadingLines = [
+    "iphone",
+    "android",
+    "appar",
+    "ios",
+    "inbyggt i iphone",
+    "inbyggt i android",
+  ];
 
   function normalizeHeadingCandidate(value: string) {
     return sanitizeInlineMarkdown(
@@ -297,6 +306,19 @@ function formatReply(
         .replace(/^__(.+)__$/, "$1")
         .replace(/:$/, "")
         .trim()
+    );
+  }
+
+  function isShortStandaloneSubheading(value: string) {
+    const trimmedValue = value.trim();
+    const normalizedValue = trimmedValue.toLowerCase();
+
+    return (
+      subheadingLines.includes(normalizedValue) ||
+      (/^[A-ZÅÄÖ][A-Za-zÅÄÖåäö0-9 /()-]{1,28}$/.test(trimmedValue) &&
+        trimmedValue.split(/\s+/).length <= 4 &&
+        !trimmedValue.includes(":") &&
+        !trimmedValue.includes("."))
     );
   }
 
@@ -353,12 +375,18 @@ function formatReply(
       continue;
     }
 
+    if (isShortStandaloneSubheading(cleanedLine)) {
+      blocks.push({ type: "subheading", value: cleanedLine });
+      previousLineWasListItem = false;
+      continue;
+    }
+
     if (bulletMatch) {
       const bulletValue = sanitizeInlineMarkdown(bulletMatch[1]);
 
       if (isStandaloneListHeading(bulletValue)) {
         blocks.push({
-          type: "heading",
+          type: "subheading",
           value: bulletValue.replace(/:$/, "").trim(),
         });
         previousLineWasListItem = false;
@@ -383,7 +411,7 @@ function formatReply(
 
       if (isStandaloneListHeading(numberedValue)) {
         blocks.push({
-          type: "heading",
+          type: "subheading",
           value: numberedValue.replace(/:$/, "").trim(),
         });
         previousLineWasListItem = false;
@@ -428,12 +456,27 @@ function formatReply(
     previousLineWasListItem = false;
   }
 
+  const firstHeadingIndex = blocks.findIndex((block) => block.type === "heading");
+  if (firstHeadingIndex > 0) {
+    while (blocks[0] && blocks[0].type === "paragraph") {
+      blocks.shift();
+    }
+  }
+
   return blocks.map((block, index) => {
     if (block.type === "heading") {
       return (
         <h3 key={index} style={styles.replyHeading}>
           {block.value}
         </h3>
+      );
+    }
+
+    if (block.type === "subheading") {
+      return (
+        <h4 key={index} style={styles.replySubheading}>
+          {block.value}
+        </h4>
       );
     }
 
@@ -867,10 +910,18 @@ function createStyles(
       cursor: "pointer",
     },
     replyHeading: {
-      margin: "12px 0 2px 0",
-      fontSize: 15 * scale,
+      margin: "18px 0 6px 0",
+      fontSize: 18 * scale,
       fontWeight: 700,
       color: secondaryText,
+      lineHeight: 1.35,
+    },
+    replySubheading: {
+      margin: "14px 0 4px 0",
+      fontSize: 16 * scale,
+      fontWeight: 700,
+      color: mainText,
+      lineHeight: 1.4,
     },
     replyParagraph: {
       margin: "0 0 12px 0",
