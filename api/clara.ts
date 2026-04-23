@@ -27,7 +27,14 @@ Om användaren ställer en följdfråga ska du bygga vidare på tidigare samtal.
 Svara på användarens senaste meddelande, men använd hela samtalet som sammanhang.
 Upprepa inte hela tidigare svaret om det inte behövs för att användaren ska förstå.
 
-Struktur:
+Svarsläge:
+Om det är användarens första fråga i samtalet ska du använda den fasta strukturen nedan.
+Om det är en följdfråga ska du svara direkt på frågan i friare form.
+Vid följdfrågor behöver du inte använda de fasta rubrikerna.
+Vid följdfrågor får du skriva ett kort direkt svar, eller en kort lista om det hjälper, men håll svaret tydligt och naturligt.
+Vid följdfrågor ska du fortfarande hålla dig inom samma område: teknik som hjälper personer med synnedsättning i vardagen.
+
+Struktur för första svaret:
 Använd vanliga rubriker i ren text.
 Använd inte markdown i svaret.
 Skriv aldrig tecken som *, #, _, eller \` för formatering.
@@ -94,6 +101,10 @@ function normalizeMessages(input: unknown): ConversationMessage[] {
 }
 
 function buildPrompt(messages: ConversationMessage[], latestUserMessage: string) {
+  const userMessageCount = messages.filter(
+    (message) => message.role === "user"
+  ).length;
+  const isFirstQuestion = userMessageCount <= 1;
   const conversationContext = messages
     .map((message) => {
       const speaker = message.role === "assistant" ? "Clara" : "Användaren";
@@ -101,13 +112,16 @@ function buildPrompt(messages: ConversationMessage[], latestUserMessage: string)
     })
     .join("\n\n");
 
-  return `Samtalet hittills:
+  return `${isFirstQuestion ? "Detta är användarens första fråga i samtalet." : "Detta är en följdfråga i ett pågående samtal."}
+
+Samtalet hittills:
 ${conversationContext}
 
 Användarens senaste meddelande:
 ${latestUserMessage}
 
-Svara nu som Clara.`;
+Svara nu som Clara.
+${isFirstQuestion ? "Använd den fasta strukturen för första svaret." : "Svara friare och direkt på följdfrågan utan att tvinga in svaret i den fasta första-svarsstrukturen."}`;
 }
 
 async function generateWithGoogle(prompt: string) {
