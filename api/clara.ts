@@ -8,71 +8,7 @@ type ConversationMessage = {
   content: string;
 };
 
-function normalizeMessages(input: unknown): ConversationMessage[] {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
-  return input.flatMap((message) => {
-    if (
-      !message ||
-      typeof message !== "object" ||
-      !("role" in message) ||
-      !("content" in message)
-    ) {
-      return [];
-    }
-
-    const role = message.role;
-    const content = message.content;
-
-    if (
-      (role !== "user" && role !== "assistant") ||
-      typeof content !== "string" ||
-      content.trim() === ""
-    ) {
-      return [];
-    }
-
-    return [{ role, content: content.trim() }];
-  });
-}
-
-export default async function handler(req: any, res: any) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ reply: "Method not allowed" });
-  }
-
-  const { problem, messages } = req.body ?? {};
-
-  const normalizedMessages = normalizeMessages(messages);
-
-  if (!normalizedMessages.length && typeof problem === "string" && problem.trim()) {
-    normalizedMessages.push({
-      role: "user",
-      content: problem.trim(),
-    });
-  }
-
-  const latestUserMessage = [...normalizedMessages]
-    .reverse()
-    .find((message) => message.role === "user")
-    ?.content;
-
-  if (!latestUserMessage) {
-    return res
-      .status(400)
-      .json({ reply: "Beskriv ditt problem kort så hjälper jag dig." });
-  }
-
-  const conversationContext = normalizedMessages
-    .map((message) => {
-      const speaker = message.role === "assistant" ? "Clara" : "Användaren";
-      return `${speaker}: ${message.content}`;
-    })
-    .join("\n\n");
-
-  const CLARA_SYSTEM_PROMPT = `Du är Clara.
+const CLARA_SYSTEM_PROMPT = `Du är Clara.
 
 Du hjälper personer med synnedsättning att lösa vardagsproblem med teknik.
 
@@ -121,20 +57,140 @@ Nämn språk endast om du är säker på att appen saknar svenska, och skriv då
 Om du är osäker på språkstöd, skriv inget om språk.
 Undvik detaljerade steg för steg instruktioner om knapptryckningar.`;
 
-  try {
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
-      system: CLARA_SYSTEM_PROMPT,
-      prompt: `Samtalet hittills:
+function normalizeMessages(input: unknown): ConversationMessage[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input.flatMap((message) => {
+    if (
+      !message ||
+      typeof message !== "object" ||
+      !("role" in message) ||
+      !("content" in message)
+    ) {
+      return [];
+    }
+
+    const role = message.role;
+    const content = message.content;
+
+    if (
+      (role !== "user" && role !== "assistant") ||
+      typeof content !== "string" ||
+      content.trim() === ""
+    ) {
+      return [];
+    }
+
+    return [{ role, content: content.trim() }];
+  });
+}
+
+function buildPrompt(messages: ConversationMessage[], latestUserMessage: string) {
+  const conversationContext = messages
+    .map((message) => {
+      const speaker = message.role === "assistant" ? "Clara" : "Användaren";
+      return `${speaker}: ${message.content}`;
+    })
+    .join("\n\n");
+
+  return `Samtalet hittills:
 ${conversationContext}
 
 Användarens senaste meddelande:
 ${latestUserMessage}
 
-Svara nu som Clara.`,
-    });
+Svara nu som Clara.`;
+}
 
-    return res.status(200).json({ reply: text || "Fick inget svar." });
+async function generateWithGoogle(prompt: string) {
+  const { text } = await generateText({
+    model: google("gemini-2.5-flash"),
+    system: CLARA_SYSTEM_PROMPT,
+    prompt,
+  });
+
+  return text || "Fick inget svar.";
+}
+
+async function generateWithOpenAI(prompt: string) {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      input: `${CLARA_SYSTEM_PROMPT}
+
+${prompt}`,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return (
+    data?.output_text ||
+    data?.output?.[0]?.content?.[0]?.text ||
+    "Fick inget svar."
+  );
+}
+
+export default async function handler(req: any, res: any) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ reply: "Method not allowed" });
+  }
+
+  const { problem, messages } = req.body ?? {};
+
+  const normalizedMessages = normalizeMessages(messages);
+
+  if (!normalizedMessages.length && typeof problem === "string" && problem.trim()) {
+    normalizedMessages.push({
+      role: "user",
+      content: problem.trim(),
+    });
+  }
+
+  const latestUserMessage = [...normalizedMessages]
+    .reverse()
+    .find((message) => message.role === "user")
+    ?.content;
+
+  if (!latestUserMessage) {
+    return res
+      .status(400)
+      .json({ reply: "Beskriv ditt problem kort så hjälper jag dig." });
+  }
+
+  const prompt = buildPrompt(normalizedMessages, latestUserMessage);
+
+  try {
+    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      try {
+        const reply = await generateWithGoogle(prompt);
+        return res.status(200).json({ reply });
+      } catch (error) {
+        console.error("Clara Google error:", error);
+      }
+    }
+
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const reply = await generateWithOpenAI(prompt);
+        return res.status(200).json({ reply });
+      } catch (error) {
+        console.error("Clara OpenAI error:", error);
+      }
+    }
+
+    throw new Error("No working AI provider configured.");
   } catch (error) {
     console.error("Clara error:", error);
 

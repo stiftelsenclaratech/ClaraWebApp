@@ -11,11 +11,9 @@ const EXAMPLES = [
 const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
 const THINKING_REPLY = "Clara tänker...";
 const CLARA_PURPLE = "#6d28d9";
-const INITIAL_MESSAGE_ID = "assistant-initial";
 
 type ThemeMode = "system" | "light" | "dark" | "contrast";
 type ConversationRole = "user" | "assistant";
-type MessageVariant = "intro" | "reply" | "user";
 
 type ApiConversationMessage = {
   role: ConversationRole;
@@ -24,7 +22,11 @@ type ApiConversationMessage = {
 
 type ConversationMessage = ApiConversationMessage & {
   id: string;
-  variant: MessageVariant;
+};
+
+type ActionFeedbackState = {
+  messageId: string | null;
+  text: string;
 };
 
 type AnnouncementState = {
@@ -32,10 +34,31 @@ type AnnouncementState = {
   text: string;
 };
 
-type ActionFeedbackState = {
-  messageId: string | null;
-  text: string;
-};
+async function postClaraRequest(body: {
+  problem: string;
+  messages?: ApiConversationMessage[];
+}) {
+  return fetch("/api/clara", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+async function readReplyFromErrorResponse(response: Response) {
+  try {
+    const errorData = await response.json();
+    if (typeof errorData?.reply === "string" && errorData.reply.trim() !== "") {
+      return errorData.reply;
+    }
+  } catch {
+    // ignore JSON parse errors for non-JSON responses
+  }
+
+  return null;
+}
 
 async function getClaraReplyFromAPI(
   messages: ApiConversationMessage[]
@@ -49,52 +72,58 @@ async function getClaraReplyFromAPI(
     return "Beskriv ditt problem kort så hjälper jag dig.";
   }
 
+  let response: Response | null = null;
+
   try {
-    const response = await fetch("/api/clara", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        problem: latestUserMessage,
-        messages,
-      }),
+    response = await postClaraRequest({
+      problem: latestUserMessage,
+      messages,
     });
-
-    if (response.status === 404) {
-      return "API hittades inte. Kör appen med Vercel lokalt (vercel dev) eller publicera till Vercel.";
-    }
-
-    if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        if (typeof errorData?.reply === "string" && errorData.reply.trim() !== "") {
-          return errorData.reply;
-        }
-      } catch {
-        // ignore JSON parse errors for non-JSON responses
-      }
-
-      return "Kunde inte hämta svar just nu. Försök igen om en stund.";
-    }
-
-    const data = await response.json();
-    return data.reply || "Fick inget svar. Testa igen.";
   } catch {
+    response = null;
+  }
+
+  if (!response || !response.ok) {
+    try {
+      const fallbackResponse = await postClaraRequest({
+        problem: latestUserMessage,
+      });
+
+      if (fallbackResponse.ok || !response) {
+        response = fallbackResponse;
+      }
+    } catch {
+      if (!response) {
+        return "Kunde inte nå tjänsten just nu.";
+      }
+    }
+  }
+
+  if (!response) {
     return "Kunde inte nå tjänsten just nu.";
   }
+
+  if (response.status === 404) {
+    return "API hittades inte. Kör appen med Vercel lokalt (vercel dev) eller publicera till Vercel.";
+  }
+
+  if (!response.ok) {
+    const reply = await readReplyFromErrorResponse(response);
+    return reply || "Kunde inte hämta svar just nu. Försök igen om en stund.";
+  }
+
+  const data = await response.json();
+  return data.reply || "Fick inget svar. Testa igen.";
 }
 
 function createMessage(
   role: ConversationRole,
-  content: string,
-  variant: MessageVariant
+  content: string
 ): ConversationMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
-    variant,
   };
 }
 
@@ -231,11 +260,16 @@ function formatReply(
   }
 
   function pushListItem(item: string, ordered: boolean) {
-    const prev = blocks[blocks.length - 1];
-    if (prev && prev.type === "list" && prev.ordered === ordered) {
-      prev.items.push(item);
+    const previousBlock = blocks[blocks.length - 1];
+    if (
+      previousBlock &&
+      previousBlock.type === "list" &&
+      previousBlock.ordered === ordered
+    ) {
+      previousBlock.items.push(item);
       return;
     }
+
     blocks.push({ type: "list", items: [item], ordered });
   }
 
@@ -250,13 +284,7 @@ function formatReply(
     const markdownHeadingMatch = line.match(/^#{1,6}\s+(.+)$/);
     const strongOnlyMatch = line.match(/^\*\*(.+)\*\*$/);
 
-    if (isHeading) {
-      blocks.push({ type: "heading", value: cleanedLine });
-      previousLineWasListItem = false;
-      continue;
-    }
-
-    if (markdownHeadingMatch || strongOnlyMatch) {
+    if (isHeading || markdownHeadingMatch || strongOnlyMatch) {
       blocks.push({ type: "heading", value: cleanedLine });
       previousLineWasListItem = false;
       continue;
@@ -485,8 +513,9 @@ function createStyles(
     : "0 12px 32px rgba(0,0,0,0.10)";
   const logoShadow = isContrast ? "none" : "0 6px 16px rgba(0,0,0,0.08)";
   const menuShadow = isContrast ? "none" : "0 18px 38px rgba(0,0,0,0.12)";
-  const userBubbleShadow = isContrast ? "none" : "0 10px 20px rgba(79,70,229,0.18)";
-  const subtleStatusColor = isContrast ? "#ffffff" : isDark ? "#cbd5e1" : "#4b5563";
+  const userBubbleBg = isContrast ? "#000000" : isDark ? "#1e3a8a" : "#eef2ff";
+  const userBubbleBorder = isContrast ? "2px solid #ffffff" : isDark ? "1px solid #3b82f6" : "1px solid #c7d2fe";
+  const subtleText = isContrast ? "#ffffff" : isDark ? "#cbd5e1" : "#4b5563";
 
   return {
     page: {
@@ -636,103 +665,6 @@ function createStyles(
       color: mutedText,
       margin: "0 0 18px 0",
     },
-    conversation: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 14,
-      textAlign: "left",
-      marginTop: 12,
-    },
-    messageGroup: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-    },
-    messageGroupUser: {
-      alignItems: "flex-end",
-    },
-    messageGroupAssistant: {
-      alignItems: "stretch",
-    },
-    messageMeta: {
-      fontSize: 12 * scale,
-      fontWeight: 700,
-      color: secondaryText,
-      paddingInline: 4,
-    },
-    messageMetaUser: {
-      textAlign: "right",
-    },
-    messageMetaAssistant: {
-      textAlign: "left",
-    },
-    assistantBubble: {
-      background: softPanel,
-      borderRadius: 20,
-      padding: 18,
-      border: softBorder,
-      textAlign: "left",
-    },
-    userBubble: {
-      width: "fit-content",
-      maxWidth: "88%",
-      marginLeft: "auto",
-      background: primaryBg,
-      color: primaryText,
-      borderRadius: 20,
-      padding: 16,
-      boxShadow: userBubbleShadow,
-      textAlign: "left",
-    },
-    userMessageText: {
-      margin: 0,
-      fontSize: 16 * scale,
-      lineHeight: 1.6,
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-word",
-    },
-    thinkingText: {
-      margin: 0,
-      fontSize: 15 * scale,
-      lineHeight: 1.6,
-      color: subtleStatusColor,
-    },
-    messageActions: {
-      marginTop: 14,
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 10,
-    },
-    inlineActionButton: {
-      padding: "10px 14px",
-      borderRadius: 14,
-      border: chipBorder,
-      background: chipBg,
-      color: chipText,
-      fontSize: 14 * scale,
-      fontWeight: 700,
-      cursor: "pointer",
-    },
-    actionFeedback: {
-      margin: "4px 0 0 0",
-      fontSize: 13 * scale,
-      lineHeight: 1.5,
-      color: subtleStatusColor,
-    },
-    composer: {
-      marginTop: 20,
-      background: softPanel,
-      borderRadius: 20,
-      padding: 18,
-      border: softBorder,
-      textAlign: "left",
-    },
-    composerTitle: {
-      margin: "0 0 12px 0",
-      fontSize: 14 * scale,
-      fontWeight: 700,
-      color: secondaryText,
-    },
     label: {
       display: "block",
       fontSize: 14 * scale,
@@ -757,12 +689,6 @@ function createStyles(
       outline: "none",
       fontFamily: "inherit",
     },
-    composerHelp: {
-      margin: "0 0 14px 0",
-      fontSize: 13 * scale,
-      lineHeight: 1.5,
-      color: subtleStatusColor,
-    },
     primaryButton: {
       width: "100%",
       padding: "14px 18px",
@@ -778,23 +704,6 @@ function createStyles(
       opacity: 0.7,
       cursor: "not-allowed",
     },
-    secondaryButton: {
-      width: "100%",
-      padding: "12px 16px",
-      borderRadius: 16,
-      border: chipBorder,
-      background: chipBg,
-      color: chipText,
-      fontSize: 15 * scale,
-      fontWeight: 700,
-      cursor: "pointer",
-    },
-    composerActions: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-      marginTop: 12,
-    },
     examplesWrap: {
       marginTop: 18,
     },
@@ -808,7 +717,7 @@ function createStyles(
       display: "flex",
       flexWrap: "wrap",
       gap: 8,
-      justifyContent: "flex-start",
+      justifyContent: "center",
     },
     chip: {
       padding: "9px 12px",
@@ -819,16 +728,36 @@ function createStyles(
       cursor: "pointer",
       fontSize: 14 * scale,
     },
-    srOnly: {
-      position: "absolute",
-      width: 1,
-      height: 1,
-      padding: 0,
-      margin: -1,
-      overflow: "hidden",
-      clip: "rect(0, 0, 0, 0)",
-      whiteSpace: "nowrap",
-      border: 0,
+    answerBox: {
+      marginTop: 20,
+      background: softPanel,
+      borderRadius: 18,
+      padding: 18,
+      textAlign: "left",
+      border: softBorder,
+    },
+    answerTitle: {
+      margin: "0 0 8px 0",
+      fontSize: 14 * scale,
+      fontWeight: 700,
+      color: secondaryText,
+    },
+    actionsWrap: {
+      marginTop: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    secondaryButton: {
+      width: "100%",
+      padding: "12px 16px",
+      borderRadius: 16,
+      border: chipBorder,
+      background: chipBg,
+      color: chipText,
+      fontSize: 15 * scale,
+      fontWeight: 700,
+      cursor: "pointer",
     },
     replyHeading: {
       margin: "12px 0 2px 0",
@@ -858,19 +787,87 @@ function createStyles(
       textUnderlineOffset: 2,
       wordBreak: "break-all",
     },
+    conversationList: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      marginTop: 20,
+      textAlign: "left",
+    },
+    userBubble: {
+      alignSelf: "flex-end",
+      maxWidth: "88%",
+      padding: "14px 16px",
+      borderRadius: 18,
+      border: userBubbleBorder,
+      background: userBubbleBg,
+      color: mainText,
+      fontSize: 16 * scale,
+      lineHeight: 1.6,
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+    },
+    thinkingText: {
+      margin: 0,
+      color: subtleText,
+      fontSize: 16 * scale,
+      lineHeight: 1.6,
+    },
+    conversationForm: {
+      marginTop: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    conversationTextarea: {
+      width: "100%",
+      minHeight: 96,
+      padding: 14,
+      borderRadius: 16,
+      border: borderColor,
+      fontSize: 16 * scale,
+      lineHeight: 1.5,
+      boxSizing: "border-box",
+      resize: "vertical",
+      background: textFieldBg,
+      color: mainText,
+      outline: "none",
+      fontFamily: "inherit",
+    },
+    conversationActions: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    messageActions: {
+      marginTop: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    messageFeedback: {
+      margin: "2px 0 0 0",
+      fontSize: 13 * scale,
+      lineHeight: 1.5,
+      color: subtleText,
+    },
+    srOnly: {
+      position: "absolute",
+      width: 1,
+      height: 1,
+      padding: 0,
+      margin: -1,
+      overflow: "hidden",
+      clip: "rect(0, 0, 0, 0)",
+      whiteSpace: "nowrap",
+      border: 0,
+    },
   };
 }
 
 export default function App() {
   const [problem, setProblem] = useState("");
-  const [messages, setMessages] = useState<ConversationMessage[]>([
-    {
-      id: INITIAL_MESSAGE_ID,
-      role: "assistant",
-      content: INITIAL_REPLY,
-      variant: "intro",
-    },
-  ]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [systemDarkMode, setSystemDarkMode] = useState(false);
@@ -1012,11 +1009,11 @@ export default function App() {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!conversationEndRef.current) {
+    if (!messages.length && !loading) {
       return;
     }
 
-    conversationEndRef.current.scrollIntoView({
+    conversationEndRef.current?.scrollIntoView({
       behavior: messages.length > 1 ? "smooth" : "auto",
       block: "end",
     });
@@ -1030,11 +1027,11 @@ export default function App() {
     [resolvedTheme, textSizeStep]
   );
 
-  const hasConversation = useMemo(() => {
-    return messages.some((message) => message.role === "user");
-  }, [messages]);
-
+  const hasConversation = messages.length > 0;
   const canSubmit = !loading && problem.trim() !== "";
+  const latestAssistantMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant");
 
   function stopSpeaking() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -1055,25 +1052,23 @@ export default function App() {
     stopSpeaking();
     setActionFeedback({ messageId: null, text: "" });
     setMenuOpen(false);
-    setProblem("");
 
-    const userMessage = createMessage("user", trimmedInput, "user");
+    const userMessage = createMessage("user", trimmedInput);
     const nextMessages = [...messages, userMessage];
-    const apiMessages = nextMessages
-      .filter((message) => message.variant !== "intro")
-      .map(({ role, content }) => ({ role, content }));
+    const apiMessages = nextMessages.map(({ role, content }) => ({ role, content }));
 
+    setProblem("");
     setMessages(nextMessages);
     setLoading(true);
 
     try {
       const result = await getClaraReplyFromAPI(apiMessages);
-      const assistantMessage = createMessage("assistant", result, "reply");
+      const assistantMessage = createMessage("assistant", result);
 
       setMessages((prev) => [...prev, assistantMessage]);
       setAnnouncement((prev) => ({
         key: prev.key + 1,
-        text: `Svar från Clara. ${result}`,
+        text: result,
       }));
     } finally {
       setLoading(false);
@@ -1090,21 +1085,14 @@ export default function App() {
 
   function handleResetConversation() {
     stopSpeaking();
-    setLoading(false);
+    setMessages([]);
     setProblem("");
-    setMessages([
-      {
-        id: INITIAL_MESSAGE_ID,
-        role: "assistant",
-        content: INITIAL_REPLY,
-        variant: "intro",
-      },
-    ]);
-    setActionFeedback({ messageId: null, text: "" });
+    setLoading(false);
     setAnnouncement((prev) => ({
       key: prev.key + 1,
       text: "Samtalet började om.",
     }));
+    setActionFeedback({ messageId: null, text: "" });
   }
 
   function handleToggleSpeech(message: ConversationMessage) {
@@ -1309,7 +1297,7 @@ export default function App() {
                   <div style={styles.panelLabel}>Tema</div>
 
                   <div style={styles.themeOptions}>
-                    {(["light", "dark", "contrast"] as ThemeMode[]).map(
+                    {(["system", "light", "dark", "contrast"] as ThemeMode[]).map(
                       (mode) => (
                         <button
                           key={mode}
@@ -1335,146 +1323,47 @@ export default function App() {
         </div>
 
         <p style={styles.intro}>
-          Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik
-          som kan hjälpa. Du kan fortsätta ställa följdfrågor i samma samtal.
+          Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik som kan hjälpa.
         </p>
 
-        <section
-          style={styles.conversation}
-          aria-label="Samtal med Clara"
-          aria-busy={loading}
-        >
-          {messages.map((message) => {
-            const isAssistant = message.role === "assistant";
-            const isReply = message.variant === "reply";
-            const isSpeakingThisMessage = speakingMessageId === message.id;
-
-            return (
-              <article
-                key={message.id}
-                style={{
-                  ...styles.messageGroup,
-                  ...(isAssistant
-                    ? styles.messageGroupAssistant
-                    : styles.messageGroupUser),
-                }}
-                aria-label={isAssistant ? "Svar från Clara" : "Ditt meddelande"}
-              >
-                <div
-                  style={{
-                    ...styles.messageMeta,
-                    ...(isAssistant
-                      ? styles.messageMetaAssistant
-                      : styles.messageMetaUser),
-                  }}
-                >
-                  {isAssistant ? "Clara" : "Du"}
-                </div>
-
-                <div
-                  style={isAssistant ? styles.assistantBubble : styles.userBubble}
-                >
-                  {isAssistant ? (
-                    <div>{formatReply(message.content, styles)}</div>
-                  ) : (
-                    <p style={styles.userMessageText}>{message.content}</p>
-                  )}
-
-                  {isReply && (
-                    <>
-                      <div style={styles.messageActions}>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSpeech(message)}
-                          style={styles.inlineActionButton}
-                          aria-label={
-                            isSpeakingThisMessage
-                              ? "Stoppa uppläsning av det här svaret"
-                              : "Läs upp det här svaret"
-                          }
-                          title={
-                            isSpeakingThisMessage ? "Stoppa uppläsning" : "Läs upp svaret"
-                          }
-                        >
-                          {isSpeakingThisMessage ? "Stoppa uppläsning" : "Läs upp svaret"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleShareOrSave(message)}
-                          style={styles.inlineActionButton}
-                          aria-label="Dela eller spara det här svaret"
-                          title="Dela eller spara svaret"
-                        >
-                          Dela eller spara
-                        </button>
-                      </div>
-
-                      {actionFeedback.messageId === message.id && actionFeedback.text && (
-                        <p style={styles.actionFeedback}>{actionFeedback.text}</p>
-                      )}
-                    </>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-
-          {loading && (
-            <article
-              style={{
-                ...styles.messageGroup,
-                ...styles.messageGroupAssistant,
+        {!hasConversation ? (
+          <>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmit();
               }}
-              aria-label="Clara tänker"
+              aria-label="Formulär för att beskriva problem"
             >
-              <div
+              <label htmlFor="clara-problem" style={styles.label}>
+                Beskriv ditt problem
+              </label>
+
+              <textarea
+                id="clara-problem"
+                value={problem}
+                onChange={(event) => setProblem(event.target.value)}
+                placeholder="Till exempel: Jag kan inte läsa min post"
+                style={styles.textarea}
+                aria-label="Beskriv ditt problem"
+              />
+
+              <button
+                type="submit"
+                disabled={!canSubmit}
                 style={{
-                  ...styles.messageMeta,
-                  ...styles.messageMetaAssistant,
+                  ...styles.primaryButton,
+                  ...(!canSubmit ? styles.primaryButtonDisabled : {}),
                 }}
+                aria-label={loading ? "Clara tänker" : "Få hjälp"}
+                title="Få hjälp"
               >
-                Clara
-              </div>
+                {loading ? "Clara tänker..." : "Få hjälp"}
+              </button>
+            </form>
 
-              <div style={styles.assistantBubble}>
-                <p style={styles.thinkingText}>{THINKING_REPLY}</p>
-              </div>
-            </article>
-          )}
-
-        </section>
-
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void handleSubmit();
-          }}
-          aria-label="Formulär för att beskriva problem"
-          style={styles.composer}
-        >
-          <h2 style={styles.composerTitle}>Fortsätt samtalet</h2>
-
-          <label htmlFor="clara-problem" style={styles.label}>
-            Skriv nästa fråga eller beskriv mer
-          </label>
-
-          <textarea
-            id="clara-problem"
-            value={problem}
-            onChange={(event) => setProblem(event.target.value)}
-            placeholder="Till exempel: Finns det något enklare sätt att göra detta i mobilen?"
-            style={styles.textarea}
-            aria-describedby="clara-help-text"
-          />
-
-          <p id="clara-help-text" style={styles.composerHelp}>
-            Skriv din fråga här under så fortsätter Clara från det senaste svaret.
-          </p>
-
-          {!hasConversation && (
             <div style={styles.examplesWrap}>
-              <div style={styles.examplesTitle}>Eller prova ett exempel</div>
+              <div style={styles.examplesTitle}>Prova ett exempel</div>
               <div style={styles.chips}>
                 {EXAMPLES.map((example) => (
                   <button
@@ -1491,40 +1380,134 @@ export default function App() {
                 ))}
               </div>
             </div>
-          )}
 
-          <div style={styles.composerActions}>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              style={{
-                ...styles.primaryButton,
-                ...(!canSubmit ? styles.primaryButtonDisabled : {}),
-              }}
-              aria-label={loading ? "Clara tänker" : "Skicka fråga"}
-              title="Skicka fråga"
+            <div style={styles.answerBox}>
+              <p style={styles.answerTitle}>Svar</p>
+              <div>{formatReply(INITIAL_REPLY, styles)}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <section
+              style={styles.conversationList}
+              aria-label="Samtal med Clara"
+              aria-busy={loading}
             >
-              {loading ? "Clara tänker..." : "Skicka fråga"}
-            </button>
+              {messages.map((message) => {
+                if (message.role === "user") {
+                  return (
+                    <div key={message.id} style={styles.userBubble}>
+                      {message.content}
+                    </div>
+                  );
+                }
 
-            {hasConversation && (
-              <button
-                type="button"
-                onClick={handleResetConversation}
-                style={styles.secondaryButton}
-                aria-label="Börja om samtalet"
-                title="Börja om samtalet"
-                disabled={loading}
-              >
-                Börja om samtalet
-              </button>
-            )}
-          </div>
-        </form>
+                const isLatestAssistantMessage = latestAssistantMessage?.id === message.id;
+                const isSpeaking = speakingMessageId === message.id;
+
+                return (
+                  <div key={message.id} style={styles.answerBox}>
+                    <div>{formatReply(message.content, styles)}</div>
+
+                    {isLatestAssistantMessage && (
+                      <>
+                        <div style={styles.messageActions}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSpeech(message)}
+                            style={styles.secondaryButton}
+                            aria-label={
+                              isSpeaking
+                                ? "Stoppa uppläsning av senaste svaret"
+                                : "Läs upp senaste svaret"
+                            }
+                            title={isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
+                          >
+                            {isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void handleShareOrSave(message)}
+                            style={styles.secondaryButton}
+                            aria-label="Dela eller spara senaste svaret"
+                            title="Dela eller spara svaret"
+                          >
+                            Dela eller spara
+                          </button>
+                        </div>
+
+                        {actionFeedback.messageId === message.id && actionFeedback.text && (
+                          <p style={styles.messageFeedback}>{actionFeedback.text}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {loading && (
+                <div style={styles.answerBox} aria-label="Clara tänker">
+                  <p style={styles.thinkingText}>{THINKING_REPLY}</p>
+                </div>
+              )}
+            </section>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmit();
+              }}
+              aria-label="Fortsätt samtalet"
+              style={styles.conversationForm}
+            >
+              <textarea
+                id="clara-problem"
+                value={problem}
+                onChange={(event) => setProblem(event.target.value)}
+                placeholder="Skriv nästa fråga eller beskriv mer"
+                style={styles.conversationTextarea}
+                aria-label="Skriv nästa fråga eller beskriv mer"
+              />
+
+              <div style={styles.conversationActions}>
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  style={{
+                    ...styles.primaryButton,
+                    ...(!canSubmit ? styles.primaryButtonDisabled : {}),
+                  }}
+                  aria-label={loading ? "Clara tänker" : "Skicka fråga"}
+                  title="Skicka fråga"
+                >
+                  {loading ? "Clara tänker..." : "Skicka fråga"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetConversation}
+                  style={styles.secondaryButton}
+                  aria-label="Börja om samtalet"
+                  title="Börja om samtalet"
+                  disabled={loading}
+                >
+                  Börja om samtalet
+                </button>
+              </div>
+            </form>
+          </>
+        )}
 
         <div ref={conversationEndRef} />
 
-        <p key={announcement.key} style={styles.srOnly} role="status" aria-atomic="true">
+        <p
+          key={announcement.key}
+          style={styles.srOnly}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {announcement.text}
         </p>
       </div>
