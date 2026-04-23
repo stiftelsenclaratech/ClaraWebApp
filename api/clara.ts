@@ -53,6 +53,7 @@ Låt varje app eller tjänst och dess länk vara i samma punkt eller samma rad.
 Lägg inte länken som en egen punkt eller på en egen rad utan sammanhang.
 Använd inte punktlistor för mellanrubriker som iPhone, Android eller Appar.
 Om du delar upp efter plattform, skriv plattformens namn som en vanlig rad och lägg själva förslagen under den.
+När du länkar till App Store ska du använda den direkta appsidan på apps.apple.com för just appen, inte söksidor eller allmänna informationssidor.
 
 Viktigt:
 Börja inte med avancerade hjälpmedel om telefonen kan räcka.

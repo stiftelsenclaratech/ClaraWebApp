@@ -158,6 +158,32 @@ function formatReply(
   reply: string,
   styles: Record<string, CSSProperties>
 ) {
+  function isAppStoreUrl(url: string) {
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname === "apps.apple.com";
+    } catch {
+      return false;
+    }
+  }
+
+  function getLinkHref(url: string) {
+    if (!isAppStoreUrl(url)) {
+      return url;
+    }
+
+    try {
+      const parsed = new URL(url);
+      return `itms-apps://${parsed.host}${parsed.pathname}${parsed.search}`;
+    } catch {
+      return url;
+    }
+  }
+
+  function getLinkTarget(url: string) {
+    return isAppStoreUrl(url) ? "_self" : "_blank";
+  }
+
   function isUrlOnlyLine(value: string) {
     return /^https?:\/\/\S+$/i.test(value.trim());
   }
@@ -202,8 +228,8 @@ function formatReply(
       return (
         <a
           key={`${part}-${index}`}
-          href={part}
-          target="_blank"
+          href={getLinkHref(part)}
+          target={getLinkTarget(part)}
           rel="noreferrer noopener"
           style={styles.replyLink}
           aria-label={`Öppna länk: ${getLinkLabel(part)}`}
