@@ -1310,22 +1310,17 @@ export default function App() {
     }`;
   }
 
-  function buildReplyExportText(message: ConversationMessage) {
-    const index = messages.findIndex((item) => item.id === message.id);
-    const previousUserMessage = messages
-      .slice(0, index)
-      .reverse()
-      .find((item) => item.role === "user");
-
-    const sections = [];
-
-    if (previousUserMessage) {
-      sections.push(`Din fråga\n${previousUserMessage.content}`);
+  function buildConversationExportText() {
+    if (!messages.length) {
+      return "Samtalet är tomt.";
     }
 
-    sections.push(`Svar från Clara\n${message.content}`);
-
-    return sections.join("\n\n");
+    return messages
+      .map((message) => {
+        const label = message.role === "user" ? "Du" : "Clara";
+        return `${label}\n${message.content}`;
+      })
+      .join("\n\n");
   }
 
   function saveReplyToFile(content: string) {
@@ -1346,8 +1341,9 @@ export default function App() {
     window.URL.revokeObjectURL(url);
   }
 
-  async function handleShareOrSave(message: ConversationMessage) {
-    const exportText = buildReplyExportText(message);
+  async function handleShareOrSave() {
+    const exportText = buildConversationExportText();
+    const feedbackMessageId = latestAssistantMessage?.id ?? null;
 
     try {
       if (
@@ -1359,7 +1355,7 @@ export default function App() {
           text: exportText,
         });
         setActionFeedback({
-          messageId: message.id,
+          messageId: feedbackMessageId,
           text: "Delningsmenyn öppnades.",
         });
         return;
@@ -1367,7 +1363,7 @@ export default function App() {
 
       saveReplyToFile(exportText);
       setActionFeedback({
-        messageId: message.id,
+        messageId: feedbackMessageId,
         text: "Svaret sparades som en textfil.",
       });
     } catch (error) {
@@ -1383,7 +1379,7 @@ export default function App() {
         ) {
           await navigator.clipboard.writeText(exportText);
           setActionFeedback({
-            messageId: message.id,
+            messageId: feedbackMessageId,
             text: "Svaret kopierades till urklipp.",
           });
           return;
@@ -1393,7 +1389,7 @@ export default function App() {
       }
 
       setActionFeedback({
-        messageId: message.id,
+        messageId: feedbackMessageId,
         text: "Det gick inte att dela eller spara svaret just nu.",
       });
     }
@@ -1567,25 +1563,25 @@ export default function App() {
                   <div key={message.id} style={styles.answerBox}>
                     <div>{formatReply(message.content, styles)}</div>
 
-                    {isLatestAssistantMessage && (
-                      <>
-                        <div style={styles.messageActions}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSpeech(message)}
-                            style={styles.secondaryButton}
-                            aria-label={
-                              isSpeaking
-                                ? "Stoppa uppläsning av senaste svaret"
-                                : "Läs upp senaste svaret"
-                            }
-                            title={isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
-                          >
-                            {isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    <div style={styles.messageActions}>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSpeech(message)}
+                        style={styles.secondaryButton}
+                        aria-label={
+                          isSpeaking
+                            ? isLatestAssistantMessage
+                              ? "Stoppa uppläsning av senaste svaret"
+                              : "Stoppa uppläsning av det här tidigare svaret"
+                            : isLatestAssistantMessage
+                            ? "Läs upp senaste svaret"
+                            : "Läs upp det här tidigare svaret"
+                        }
+                        title={isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
+                      >
+                        {isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1632,7 +1628,7 @@ export default function App() {
                   <>
                     <button
                       type="button"
-                      onClick={() => void handleShareOrSave(latestAssistantMessage)}
+                      onClick={() => void handleShareOrSave()}
                       style={styles.secondaryButton}
                       aria-label="Dela eller spara senaste svaret"
                       title="Dela eller spara svaret"
