@@ -1,9 +1,76 @@
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
+
+type ConversationRole = "user" | "assistant";
+
+type ConversationMessage = {
+  role: ConversationRole;
+  content: string;
+};
+
+function normalizeMessages(input: unknown): ConversationMessage[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input.flatMap((message) => {
+    if (
+      !message ||
+      typeof message !== "object" ||
+      !("role" in message) ||
+      !("content" in message)
+    ) {
+      return [];
+    }
+
+    const role = message.role;
+    const content = message.content;
+
+    if (
+      (role !== "user" && role !== "assistant") ||
+      typeof content !== "string" ||
+      content.trim() === ""
+    ) {
+      return [];
+    }
+
+    return [{ role, content: content.trim() }];
+  });
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return res.status(405).json({ reply: "Method not allowed" });
   }
 
-  const { problem } = req.body;
+  const { problem, messages } = req.body ?? {};
+
+  const normalizedMessages = normalizeMessages(messages);
+
+  if (!normalizedMessages.length && typeof problem === "string" && problem.trim()) {
+    normalizedMessages.push({
+      role: "user",
+      content: problem.trim(),
+    });
+  }
+
+  const latestUserMessage = [...normalizedMessages]
+    .reverse()
+    .find((message) => message.role === "user")
+    ?.content;
+
+  if (!latestUserMessage) {
+    return res
+      .status(400)
+      .json({ reply: "Beskriv ditt problem kort så hjälper jag dig." });
+  }
+
+  const conversationContext = normalizedMessages
+    .map((message) => {
+      const speaker = message.role === "assistant" ? "Clara" : "Användaren";
+      return `${speaker}: ${message.content}`;
+    })
+    .join("\n\n");
 
   const CLARA_SYSTEM_PROMPT = `Du är Clara.
 
@@ -12,21 +79,28 @@ Du hjälper personer med synnedsättning att lösa vardagsproblem med teknik.
 Regler:
 Ge alltid ett enkelt och vardagsnära första förslag som användaren själv kan testa direkt.
 Börja helst med sådant som redan finns i användarens telefon.
-Prioritera telefonen först om det är möjligt.
-Prioritera röstassistent, kamera, uppläsning, sensorer och automatisering.
+Prioritera telefonen först när det är möjligt.
+Prioritera i första hand inbyggda funktioner som röstassistent, OCR/textigenkänning, förstorare och uppläsning.
 Ge alltid teknikförslag.
 Undvik allmänna råd utan teknik.
 Undvik långa förklaringar.
 Svara kort, tydligt och konkret.
 Svara alltid på svenska.
+Om användaren ställer en följdfråga ska du bygga vidare på tidigare samtal.
+Svara på användarens senaste meddelande, men använd hela samtalet som sammanhang.
+Upprepa inte hela tidigare svaret om det inte behövs för att användaren ska förstå.
 
 Struktur:
+Använd vanliga rubriker i ren text.
+Använd inte markdown i svaret.
+Skriv aldrig tecken som *, #, _, eller \` för formatering.
+
 Problem
-Kort tolkning av vad användaren vill lösa.
+Kort tolkning av vad användaren vill lösa just nu.
 
 Första steg
 Det enklaste och mest vardagsnära teknikförslaget.
-Det ska ofta vara något i telefonen eller via röstassistent.
+Det ska i första hand vara en inbyggd funktion i telefonen (röstassistent, OCR/textigenkänning, förstorare eller uppläsning) när det går.
 
 Fler möjligheter
 2 till 3 korta idéer.
@@ -34,35 +108,33 @@ De ska vara verkliga, enkla och användbara.
 
 Teknik
 Konkreta exempel på funktioner, appar eller hjälpmedel.
+Ge 1 till 3 konkreta exempel med länk när det är möjligt.
+Använd hela URL:er (https://...).
+Välj i första hand officiella länkar, till exempel appens officiella sida eller App Store/Google Play.
+Skriv tydligt vilken plattform länken gäller, till exempel: "App Store (iOS)" eller "Google Play (Android)".
 
 Viktigt:
 Börja inte med avancerade hjälpmedel om telefonen kan räcka.
 Låt svaret kännas lugnt, enkelt och möjligt att testa direkt.
+Nämn aldrig språk för en app om det inte efterfrågas.
+Nämn språk endast om du är säker på att appen saknar svenska, och skriv då kort: "Finns inte på svenska."
+Om du är osäker på språkstöd, skriv inget om språk.
 Undvik detaljerade steg för steg instruktioner om knapptryckningar.`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        input: `${CLARA_SYSTEM_PROMPT}
+    const { text } = await generateText({
+      model: google("gemini-2.5-flash"),
+      system: CLARA_SYSTEM_PROMPT,
+      prompt: `Samtalet hittills:
+${conversationContext}
 
-Problem: ${problem}`,
-      }),
+Användarens senaste meddelande:
+${latestUserMessage}
+
+Svara nu som Clara.`,
     });
 
-    const data = await response.json();
-
-    const text =
-      data?.output_text ||
-      data?.output?.[0]?.content?.[0]?.text ||
-      "Fick inget svar.";
-
-    return res.status(200).json({ reply: text });
+    return res.status(200).json({ reply: text || "Fick inget svar." });
   } catch (error) {
     console.error("Clara error:", error);
 

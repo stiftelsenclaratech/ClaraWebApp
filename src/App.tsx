@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import claraLogo from "./clara.png";
 
 const EXAMPLES = [
@@ -11,13 +11,41 @@ const EXAMPLES = [
 const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
 const THINKING_REPLY = "Clara tänker...";
 const CLARA_PURPLE = "#6d28d9";
+const INITIAL_MESSAGE_ID = "assistant-initial";
 
 type ThemeMode = "system" | "light" | "dark" | "contrast";
+type ConversationRole = "user" | "assistant";
+type MessageVariant = "intro" | "reply" | "user";
 
-async function getClaraReplyFromAPI(input: string): Promise<string> {
-  const trimmedInput = input.trim();
+type ApiConversationMessage = {
+  role: ConversationRole;
+  content: string;
+};
 
-  if (!trimmedInput) {
+type ConversationMessage = ApiConversationMessage & {
+  id: string;
+  variant: MessageVariant;
+};
+
+type AnnouncementState = {
+  key: number;
+  text: string;
+};
+
+type ActionFeedbackState = {
+  messageId: string | null;
+  text: string;
+};
+
+async function getClaraReplyFromAPI(
+  messages: ApiConversationMessage[]
+): Promise<string> {
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "user")
+    ?.content.trim();
+
+  if (!latestUserMessage) {
     return "Beskriv ditt problem kort så hjälper jag dig.";
   }
 
@@ -27,11 +55,27 @@ async function getClaraReplyFromAPI(input: string): Promise<string> {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ problem: trimmedInput }),
+      body: JSON.stringify({
+        problem: latestUserMessage,
+        messages,
+      }),
     });
 
+    if (response.status === 404) {
+      return "API hittades inte. Kör appen med Vercel lokalt (vercel dev) eller publicera till Vercel.";
+    }
+
     if (!response.ok) {
-      return "Kunde inte hämta svar just nu.";
+      try {
+        const errorData = await response.json();
+        if (typeof errorData?.reply === "string" && errorData.reply.trim() !== "") {
+          return errorData.reply;
+        }
+      } catch {
+        // ignore JSON parse errors for non-JSON responses
+      }
+
+      return "Kunde inte hämta svar just nu. Försök igen om en stund.";
     }
 
     const data = await response.json();
@@ -39,6 +83,19 @@ async function getClaraReplyFromAPI(input: string): Promise<string> {
   } catch {
     return "Kunde inte nå tjänsten just nu.";
   }
+}
+
+function createMessage(
+  role: ConversationRole,
+  content: string,
+  variant: MessageVariant
+): ConversationMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+    variant,
+  };
 }
 
 function getBestSwedishVoice(): SpeechSynthesisVoice | null {
@@ -72,6 +129,78 @@ function formatReply(
   reply: string,
   styles: Record<string, CSSProperties>
 ) {
+  function getLinkLabel(url: string) {
+    const lower = url.toLowerCase();
+    if (lower.includes("apps.apple.com")) return "App Store (iOS)";
+    if (lower.includes("play.google.com")) return "Google Play (Android)";
+    if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "YouTube";
+    if (lower.includes("support.apple.com")) return "Apple Support";
+    if (lower.includes("support.google.com")) return "Google Support";
+
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname.replace(/^www\./, "");
+    } catch {
+      return "Länk";
+    }
+  }
+
+  function renderTextWithLinks(value: string): ReactNode[] {
+    const urlRegex = /(https?:\/\/[^\s)]+[^\s.,;!?)]?)/g;
+    const parts = value.split(urlRegex);
+
+    return parts.map((part, index) => {
+      const isUrl = /^https?:\/\//.test(part);
+      if (!isUrl) {
+        return part;
+      }
+
+      return (
+        <a
+          key={`${part}-${index}`}
+          href={part}
+          target="_blank"
+          rel="noreferrer noopener"
+          style={styles.replyLink}
+          aria-label={`Öppna länk: ${getLinkLabel(part)}`}
+        >
+          {getLinkLabel(part)}
+        </a>
+      );
+    });
+  }
+
+  function renderLineContent(value: string): ReactNode {
+    if (/^https?:\/\//i.test(value.trim())) {
+      return <>{renderTextWithLinks(value)}</>;
+    }
+
+    const subHeadingMatch = value.match(/^([^:]{2,40}):\s*(.+)$/);
+    if (subHeadingMatch) {
+      const label = subHeadingMatch[1].trim();
+      const rest = subHeadingMatch[2].trim();
+      return (
+        <>
+          <strong>{label}:</strong>{" "}
+          {rest ? renderTextWithLinks(rest) : null}
+        </>
+      );
+    }
+
+    return <>{renderTextWithLinks(value)}</>;
+  }
+
+  function sanitizeInlineMarkdown(value: string) {
+    return value
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/__([^_]+)__/g, "$1")
+      .replace(/^\s*#{1,6}\s*/g, "")
+      .replace(/^\s*[*#]+\s*/g, "")
+      .replace(/\*/g, "")
+      .trim();
+  }
+
   const headingLines = [
     "Problem",
     "Första steg",
@@ -82,34 +211,116 @@ function formatReply(
     "Bra att veta",
   ];
 
-  const lines = reply.split("\n").map((line) => line.trim());
+  const lines = reply.split("\n").map((line) => line.trim()).filter(Boolean);
+  const blocks: Array<
+    | { type: "heading"; value: string }
+    | { type: "paragraph"; value: string }
+    | { type: "list"; items: string[]; ordered: boolean }
+  > = [];
+  let previousLineWasListItem = false;
 
-  return lines
-    .filter((line) => line !== "")
-    .map((line, index) => {
-      const isHeading = headingLines.some(
-        (heading) => line.toLowerCase() === heading.toLowerCase()
-      );
+  function normalizeHeadingCandidate(value: string) {
+    return sanitizeInlineMarkdown(
+      value
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^\*\*(.+)\*\*$/, "$1")
+        .replace(/^__(.+)__$/, "$1")
+        .replace(/:$/, "")
+        .trim()
+    );
+  }
 
-      if (isHeading) {
-        return (
-          <h3
-            key={index}
-            style={styles.replyHeading}
-            role="heading"
-            aria-level={2}
-          >
-            {line}
-          </h3>
-        );
-      }
+  function pushListItem(item: string, ordered: boolean) {
+    const prev = blocks[blocks.length - 1];
+    if (prev && prev.type === "list" && prev.ordered === ordered) {
+      prev.items.push(item);
+      return;
+    }
+    blocks.push({ type: "list", items: [item], ordered });
+  }
 
+  for (const line of lines) {
+    const cleanedLine = normalizeHeadingCandidate(line);
+    const normalized = cleanedLine.toLowerCase();
+    const isHeading = headingLines.some(
+      (heading) => normalized === heading.toLowerCase()
+    );
+    const bulletMatch = line.match(/^[-*•]\s+(.+)/);
+    const numberedMatch = line.match(/^\d+[.)]\s+(.+)/);
+    const markdownHeadingMatch = line.match(/^#{1,6}\s+(.+)$/);
+    const strongOnlyMatch = line.match(/^\*\*(.+)\*\*$/);
+
+    if (isHeading) {
+      blocks.push({ type: "heading", value: cleanedLine });
+      previousLineWasListItem = false;
+      continue;
+    }
+
+    if (markdownHeadingMatch || strongOnlyMatch) {
+      blocks.push({ type: "heading", value: cleanedLine });
+      previousLineWasListItem = false;
+      continue;
+    }
+
+    if (bulletMatch) {
+      pushListItem(sanitizeInlineMarkdown(bulletMatch[1]), false);
+      previousLineWasListItem = true;
+      continue;
+    }
+
+    if (numberedMatch) {
+      pushListItem(sanitizeInlineMarkdown(numberedMatch[1]), true);
+      previousLineWasListItem = true;
+      continue;
+    }
+
+    const sanitizedLine = sanitizeInlineMarkdown(line);
+    const previousBlock = blocks[blocks.length - 1];
+
+    if (
+      previousLineWasListItem &&
+      previousBlock &&
+      previousBlock.type === "list" &&
+      previousBlock.items.length > 0
+    ) {
+      const lastItemIndex = previousBlock.items.length - 1;
+      previousBlock.items[lastItemIndex] =
+        `${previousBlock.items[lastItemIndex]} ${sanitizedLine}`.trim();
+      continue;
+    }
+
+    blocks.push({ type: "paragraph", value: sanitizedLine });
+    previousLineWasListItem = false;
+  }
+
+  return blocks.map((block, index) => {
+    if (block.type === "heading") {
       return (
-        <p key={index} style={styles.replyParagraph}>
-          {line}
-        </p>
+        <h3 key={index} style={styles.replyHeading}>
+          {block.value}
+        </h3>
       );
-    });
+    }
+
+    if (block.type === "list") {
+      const ListTag = block.ordered ? "ol" : "ul";
+      return (
+        <ListTag key={index} style={styles.replyList}>
+          {block.items.map((item, itemIndex) => (
+            <li key={`${index}-${itemIndex}`} style={styles.replyListItem}>
+              {renderLineContent(item)}
+            </li>
+          ))}
+        </ListTag>
+      );
+    }
+
+    return (
+      <p key={index} style={styles.replyParagraph}>
+        {renderLineContent(block.value)}
+      </p>
+    );
+  });
 }
 
 function MenuIcon({ size = 22 }: { size?: number }) {
@@ -274,6 +485,8 @@ function createStyles(
     : "0 12px 32px rgba(0,0,0,0.10)";
   const logoShadow = isContrast ? "none" : "0 6px 16px rgba(0,0,0,0.08)";
   const menuShadow = isContrast ? "none" : "0 18px 38px rgba(0,0,0,0.12)";
+  const userBubbleShadow = isContrast ? "none" : "0 10px 20px rgba(79,70,229,0.18)";
+  const subtleStatusColor = isContrast ? "#ffffff" : isDark ? "#cbd5e1" : "#4b5563";
 
   return {
     page: {
@@ -423,6 +636,103 @@ function createStyles(
       color: mutedText,
       margin: "0 0 18px 0",
     },
+    conversation: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+      textAlign: "left",
+      marginTop: 12,
+    },
+    messageGroup: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+    },
+    messageGroupUser: {
+      alignItems: "flex-end",
+    },
+    messageGroupAssistant: {
+      alignItems: "stretch",
+    },
+    messageMeta: {
+      fontSize: 12 * scale,
+      fontWeight: 700,
+      color: secondaryText,
+      paddingInline: 4,
+    },
+    messageMetaUser: {
+      textAlign: "right",
+    },
+    messageMetaAssistant: {
+      textAlign: "left",
+    },
+    assistantBubble: {
+      background: softPanel,
+      borderRadius: 20,
+      padding: 18,
+      border: softBorder,
+      textAlign: "left",
+    },
+    userBubble: {
+      width: "fit-content",
+      maxWidth: "88%",
+      marginLeft: "auto",
+      background: primaryBg,
+      color: primaryText,
+      borderRadius: 20,
+      padding: 16,
+      boxShadow: userBubbleShadow,
+      textAlign: "left",
+    },
+    userMessageText: {
+      margin: 0,
+      fontSize: 16 * scale,
+      lineHeight: 1.6,
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+    },
+    thinkingText: {
+      margin: 0,
+      fontSize: 15 * scale,
+      lineHeight: 1.6,
+      color: subtleStatusColor,
+    },
+    messageActions: {
+      marginTop: 14,
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    inlineActionButton: {
+      padding: "10px 14px",
+      borderRadius: 14,
+      border: chipBorder,
+      background: chipBg,
+      color: chipText,
+      fontSize: 14 * scale,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    actionFeedback: {
+      margin: "4px 0 0 0",
+      fontSize: 13 * scale,
+      lineHeight: 1.5,
+      color: subtleStatusColor,
+    },
+    composer: {
+      marginTop: 20,
+      background: softPanel,
+      borderRadius: 20,
+      padding: 18,
+      border: softBorder,
+      textAlign: "left",
+    },
+    composerTitle: {
+      margin: "0 0 12px 0",
+      fontSize: 14 * scale,
+      fontWeight: 700,
+      color: secondaryText,
+    },
     label: {
       display: "block",
       fontSize: 14 * scale,
@@ -445,6 +755,13 @@ function createStyles(
       background: textFieldBg,
       color: mainText,
       outline: "none",
+      fontFamily: "inherit",
+    },
+    composerHelp: {
+      margin: "0 0 14px 0",
+      fontSize: 13 * scale,
+      lineHeight: 1.5,
+      color: subtleStatusColor,
     },
     primaryButton: {
       width: "100%",
@@ -461,6 +778,23 @@ function createStyles(
       opacity: 0.7,
       cursor: "not-allowed",
     },
+    secondaryButton: {
+      width: "100%",
+      padding: "12px 16px",
+      borderRadius: 16,
+      border: chipBorder,
+      background: chipBg,
+      color: chipText,
+      fontSize: 15 * scale,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    composerActions: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      marginTop: 12,
+    },
     examplesWrap: {
       marginTop: 18,
     },
@@ -474,7 +808,7 @@ function createStyles(
       display: "flex",
       flexWrap: "wrap",
       gap: 8,
-      justifyContent: "center",
+      justifyContent: "flex-start",
     },
     chip: {
       padding: "9px 12px",
@@ -485,41 +819,21 @@ function createStyles(
       cursor: "pointer",
       fontSize: 14 * scale,
     },
-    answerBox: {
-      marginTop: 20,
-      background: softPanel,
-      borderRadius: 18,
-      padding: 18,
-      textAlign: "left",
-      border: softBorder,
-    },
-    answerTitle: {
-      margin: "0 0 8px 0",
-      fontSize: 14 * scale,
-      fontWeight: 700,
-      color: secondaryText,
-    },
-    actionsWrap: {
-      marginTop: 12,
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-    },
-    secondaryButton: {
-      width: "100%",
-      padding: "12px 16px",
-      borderRadius: 16,
-      border: chipBorder,
-      background: chipBg,
-      color: chipText,
-      fontSize: 15 * scale,
-      fontWeight: 700,
-      cursor: "pointer",
+    srOnly: {
+      position: "absolute",
+      width: 1,
+      height: 1,
+      padding: 0,
+      margin: -1,
+      overflow: "hidden",
+      clip: "rect(0, 0, 0, 0)",
+      whiteSpace: "nowrap",
+      border: 0,
     },
     replyHeading: {
-      margin: "12px 0 4px 0",
+      margin: "12px 0 2px 0",
       fontSize: 15 * scale,
-      fontWeight: 600,
+      fontWeight: 700,
       color: secondaryText,
     },
     replyParagraph: {
@@ -528,20 +842,51 @@ function createStyles(
       color: mainText,
       fontSize: 16 * scale,
     },
+    replyList: {
+      margin: "0 0 12px 0",
+      paddingLeft: 22,
+      color: mainText,
+      fontSize: 16 * scale,
+      lineHeight: 1.6,
+    },
+    replyListItem: {
+      marginBottom: 6,
+    },
+    replyLink: {
+      color: isContrast ? "#ffffff" : "#4f46e5",
+      textDecoration: "underline",
+      textUnderlineOffset: 2,
+      wordBreak: "break-all",
+    },
   };
 }
 
 export default function App() {
   const [problem, setProblem] = useState("");
-  const [reply, setReply] = useState(INITIAL_REPLY);
+  const [messages, setMessages] = useState<ConversationMessage[]>([
+    {
+      id: INITIAL_MESSAGE_ID,
+      role: "assistant",
+      content: INITIAL_REPLY,
+      variant: "intro",
+    },
+  ]);
   const [loading, setLoading] = useState(false);
-  const [showExamples, setShowExamples] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [systemDarkMode, setSystemDarkMode] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>("system");
   const [textSizeStep, setTextSizeStep] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState<AnnouncementState>({
+    key: 0,
+    text: "",
+  });
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState>({
+    messageId: null,
+    text: "",
+  });
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const conversationEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -666,6 +1011,17 @@ export default function App() {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!conversationEndRef.current) {
+      return;
+    }
+
+    conversationEndRef.current.scrollIntoView({
+      behavior: messages.length > 1 ? "smooth" : "auto",
+      block: "end",
+    });
+  }, [messages, loading]);
+
   const resolvedTheme: Exclude<ThemeMode, "system"> =
     themeMode === "system" ? (systemDarkMode ? "dark" : "light") : themeMode;
 
@@ -674,23 +1030,51 @@ export default function App() {
     [resolvedTheme, textSizeStep]
   );
 
-  const showReadButton = useMemo(() => {
-    return !loading && reply !== "" && reply !== INITIAL_REPLY && reply !== THINKING_REPLY;
-  }, [loading, reply]);
+  const hasConversation = useMemo(() => {
+    return messages.some((message) => message.role === "user");
+  }, [messages]);
 
-  async function runQuery(input: string) {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+  const canSubmit = !loading && problem.trim() !== "";
+
+  function stopSpeaking() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
     }
 
-    setIsSpeaking(false);
-    setShowExamples(false);
+    window.speechSynthesis.cancel();
+    setSpeakingMessageId(null);
+  }
+
+  async function runQuery(input: string) {
+    const trimmedInput = input.trim();
+
+    if (!trimmedInput || loading) {
+      return;
+    }
+
+    stopSpeaking();
+    setActionFeedback({ messageId: null, text: "" });
+    setMenuOpen(false);
+    setProblem("");
+
+    const userMessage = createMessage("user", trimmedInput, "user");
+    const nextMessages = [...messages, userMessage];
+    const apiMessages = nextMessages
+      .filter((message) => message.variant !== "intro")
+      .map(({ role, content }) => ({ role, content }));
+
+    setMessages(nextMessages);
     setLoading(true);
-    setReply(THINKING_REPLY);
 
     try {
-      const result = await getClaraReplyFromAPI(input);
-      setReply(result);
+      const result = await getClaraReplyFromAPI(apiMessages);
+      const assistantMessage = createMessage("assistant", result, "reply");
+
+      setMessages((prev) => [...prev, assistantMessage]);
+      setAnnouncement((prev) => ({
+        key: prev.key + 1,
+        text: `Svar från Clara. ${result}`,
+      }));
     } finally {
       setLoading(false);
     }
@@ -701,42 +1085,44 @@ export default function App() {
   }
 
   async function handleExampleClick(example: string) {
-    setProblem(example);
     await runQuery(example);
   }
 
-  function handleShowExamplesAgain() {
-    setShowExamples(true);
+  function handleResetConversation() {
+    stopSpeaking();
+    setLoading(false);
     setProblem("");
-    setReply(INITIAL_REPLY);
-    setIsSpeaking(false);
-
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+    setMessages([
+      {
+        id: INITIAL_MESSAGE_ID,
+        role: "assistant",
+        content: INITIAL_REPLY,
+        variant: "intro",
+      },
+    ]);
+    setActionFeedback({ messageId: null, text: "" });
+    setAnnouncement((prev) => ({
+      key: prev.key + 1,
+      text: "Samtalet började om.",
+    }));
   }
 
-  function handleToggleSpeech() {
+  function handleToggleSpeech(message: ConversationMessage) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
 
     const synth = window.speechSynthesis;
 
-    if (isSpeaking) {
+    if (speakingMessageId === message.id) {
       synth.cancel();
-      setIsSpeaking(false);
+      setSpeakingMessageId(null);
       return;
     }
 
-    if (!reply || reply === INITIAL_REPLY || reply === THINKING_REPLY) {
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(reply);
+    const utterance = new SpeechSynthesisUtterance(message.content);
     const bestVoice = getBestSwedishVoice();
 
-    utterance.text = reply;
     utterance.lang = "sv-SE";
     utterance.rate = 1;
     utterance.pitch = 1;
@@ -748,16 +1134,16 @@ export default function App() {
     }
 
     utterance.onend = () => {
-      setIsSpeaking(false);
+      setSpeakingMessageId((current) => (current === message.id ? null : current));
     };
 
     utterance.onerror = () => {
-      setIsSpeaking(false);
+      setSpeakingMessageId((current) => (current === message.id ? null : current));
     };
 
     synth.cancel();
     synth.speak(utterance);
-    setIsSpeaking(true);
+    setSpeakingMessageId(message.id);
   }
 
   function increaseTextSize() {
@@ -778,8 +1164,97 @@ export default function App() {
     }`;
   }
 
+  function buildReplyExportText(message: ConversationMessage) {
+    const index = messages.findIndex((item) => item.id === message.id);
+    const previousUserMessage = messages
+      .slice(0, index)
+      .reverse()
+      .find((item) => item.role === "user");
+
+    const sections = [];
+
+    if (previousUserMessage) {
+      sections.push(`Din fråga\n${previousUserMessage.content}`);
+    }
+
+    sections.push(`Svar från Clara\n${message.content}`);
+
+    return sections.join("\n\n");
+  }
+
+  function saveReplyToFile(content: string) {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      throw new Error("Kan inte spara fil i den här miljön.");
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const file = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(file);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `clara-svar-${timestamp}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function handleShareOrSave(message: ConversationMessage) {
+    const exportText = buildReplyExportText(message);
+
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function"
+      ) {
+        await navigator.share({
+          title: "Svar från Clara",
+          text: exportText,
+        });
+        setActionFeedback({
+          messageId: message.id,
+          text: "Delningsmenyn öppnades.",
+        });
+        return;
+      }
+
+      saveReplyToFile(exportText);
+      setActionFeedback({
+        messageId: message.id,
+        text: "Svaret sparades som en textfil.",
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      try {
+        if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === "function"
+        ) {
+          await navigator.clipboard.writeText(exportText);
+          setActionFeedback({
+            messageId: message.id,
+            text: "Svaret kopierades till urklipp.",
+          });
+          return;
+        }
+      } catch {
+        // ignore clipboard fallback errors
+      }
+
+      setActionFeedback({
+        messageId: message.id,
+        text: "Det gick inte att dela eller spara svaret just nu.",
+      });
+    }
+  }
+
   return (
-    <div style={styles.page}>
+    <main style={styles.page} aria-label="Clara hjälpmedelsassistent">
       <div style={styles.container}>
         <div style={styles.topBar}>
           <div style={styles.topSpacer} />
@@ -834,7 +1309,7 @@ export default function App() {
                   <div style={styles.panelLabel}>Tema</div>
 
                   <div style={styles.themeOptions}>
-                    {(["system", "light", "dark", "contrast"] as ThemeMode[]).map(
+                    {(["light", "dark", "contrast"] as ThemeMode[]).map(
                       (mode) => (
                         <button
                           key={mode}
@@ -860,91 +1335,199 @@ export default function App() {
         </div>
 
         <p style={styles.intro}>
-          Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik som kan hjälpa.
+          Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik
+          som kan hjälpa. Du kan fortsätta ställa följdfrågor i samma samtal.
         </p>
 
-        <label htmlFor="clara-problem" style={styles.label}>
-          Beskriv ditt problem
-        </label>
-
-        <textarea
-          id="clara-problem"
-          value={problem}
-          onChange={(e) => setProblem(e.target.value)}
-          placeholder="Till exempel: Jag kan inte läsa min post"
-          style={styles.textarea}
-          aria-label="Beskriv ditt problem"
-        />
-
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={loading}
-          style={{
-            ...styles.primaryButton,
-            ...(loading ? styles.primaryButtonDisabled : {}),
-          }}
-          aria-label={loading ? "Clara tänker" : "Få hjälp"}
-          title="Få hjälp"
+        <section
+          style={styles.conversation}
+          aria-label="Samtal med Clara"
+          aria-busy={loading}
         >
-          {loading ? "Clara tänker..." : "Få hjälp"}
-        </button>
+          {messages.map((message) => {
+            const isAssistant = message.role === "assistant";
+            const isReply = message.variant === "reply";
+            const isSpeakingThisMessage = speakingMessageId === message.id;
 
-        {showExamples && (
-          <div style={styles.examplesWrap}>
-            <div style={styles.examplesTitle}>Prova ett exempel</div>
-            <div style={styles.chips}>
-              {EXAMPLES.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  onClick={() => void handleExampleClick(example)}
-                  style={styles.chip}
-                  aria-label={`Exempel. ${example}`}
-                  title={example}
+            return (
+              <article
+                key={message.id}
+                style={{
+                  ...styles.messageGroup,
+                  ...(isAssistant
+                    ? styles.messageGroupAssistant
+                    : styles.messageGroupUser),
+                }}
+                aria-label={isAssistant ? "Svar från Clara" : "Ditt meddelande"}
+              >
+                <div
+                  style={{
+                    ...styles.messageMeta,
+                    ...(isAssistant
+                      ? styles.messageMetaAssistant
+                      : styles.messageMetaUser),
+                  }}
                 >
-                  {example}
-                </button>
-              ))}
+                  {isAssistant ? "Clara" : "Du"}
+                </div>
+
+                <div
+                  style={isAssistant ? styles.assistantBubble : styles.userBubble}
+                >
+                  {isAssistant ? (
+                    <div>{formatReply(message.content, styles)}</div>
+                  ) : (
+                    <p style={styles.userMessageText}>{message.content}</p>
+                  )}
+
+                  {isReply && (
+                    <>
+                      <div style={styles.messageActions}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSpeech(message)}
+                          style={styles.inlineActionButton}
+                          aria-label={
+                            isSpeakingThisMessage
+                              ? "Stoppa uppläsning av det här svaret"
+                              : "Läs upp det här svaret"
+                          }
+                          title={
+                            isSpeakingThisMessage ? "Stoppa uppläsning" : "Läs upp svaret"
+                          }
+                        >
+                          {isSpeakingThisMessage ? "Stoppa uppläsning" : "Läs upp svaret"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleShareOrSave(message)}
+                          style={styles.inlineActionButton}
+                          aria-label="Dela eller spara det här svaret"
+                          title="Dela eller spara svaret"
+                        >
+                          Dela eller spara
+                        </button>
+                      </div>
+
+                      {actionFeedback.messageId === message.id && actionFeedback.text && (
+                        <p style={styles.actionFeedback}>{actionFeedback.text}</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+
+          {loading && (
+            <article
+              style={{
+                ...styles.messageGroup,
+                ...styles.messageGroupAssistant,
+              }}
+              aria-label="Clara tänker"
+            >
+              <div
+                style={{
+                  ...styles.messageMeta,
+                  ...styles.messageMetaAssistant,
+                }}
+              >
+                Clara
+              </div>
+
+              <div style={styles.assistantBubble}>
+                <p style={styles.thinkingText}>{THINKING_REPLY}</p>
+              </div>
+            </article>
+          )}
+
+        </section>
+
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSubmit();
+          }}
+          aria-label="Formulär för att beskriva problem"
+          style={styles.composer}
+        >
+          <h2 style={styles.composerTitle}>Fortsätt samtalet</h2>
+
+          <label htmlFor="clara-problem" style={styles.label}>
+            Skriv nästa fråga eller beskriv mer
+          </label>
+
+          <textarea
+            id="clara-problem"
+            value={problem}
+            onChange={(event) => setProblem(event.target.value)}
+            placeholder="Till exempel: Finns det något enklare sätt att göra detta i mobilen?"
+            style={styles.textarea}
+            aria-describedby="clara-help-text"
+          />
+
+          <p id="clara-help-text" style={styles.composerHelp}>
+            Skriv din fråga här under så fortsätter Clara från det senaste svaret.
+          </p>
+
+          {!hasConversation && (
+            <div style={styles.examplesWrap}>
+              <div style={styles.examplesTitle}>Eller prova ett exempel</div>
+              <div style={styles.chips}>
+                {EXAMPLES.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => void handleExampleClick(example)}
+                    style={styles.chip}
+                    aria-label={`Exempel. ${example}`}
+                    title={example}
+                    disabled={loading}
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
             </div>
+          )}
+
+          <div style={styles.composerActions}>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              style={{
+                ...styles.primaryButton,
+                ...(!canSubmit ? styles.primaryButtonDisabled : {}),
+              }}
+              aria-label={loading ? "Clara tänker" : "Skicka fråga"}
+              title="Skicka fråga"
+            >
+              {loading ? "Clara tänker..." : "Skicka fråga"}
+            </button>
+
+            {hasConversation && (
+              <button
+                type="button"
+                onClick={handleResetConversation}
+                style={styles.secondaryButton}
+                aria-label="Börja om samtalet"
+                title="Börja om samtalet"
+                disabled={loading}
+              >
+                Börja om samtalet
+              </button>
+            )}
           </div>
-        )}
+        </form>
 
-        <div style={styles.answerBox} aria-live="polite">
-          <p style={styles.answerTitle}>Svar</p>
-          <div>{formatReply(reply, styles)}</div>
-        </div>
+        <div ref={conversationEndRef} />
 
-        <div style={styles.actionsWrap}>
-          {showReadButton && (
-            <button
-              type="button"
-              onClick={handleToggleSpeech}
-              style={styles.secondaryButton}
-              aria-label={
-                isSpeaking
-                  ? "Sluta läsa upp svaret"
-                  : "Läs upp svaret med talsyntes"
-              }
-              title={isSpeaking ? "Sluta läsa upp" : "Läs upp svaret"}
-            >
-              {isSpeaking ? "Sluta läs upp" : "Läs upp svaret"}
-            </button>
-          )}
-
-          {!showExamples && (
-            <button
-              type="button"
-              onClick={handleShowExamplesAgain}
-              style={styles.secondaryButton}
-              aria-label="Visa exempel igen"
-              title="Visa exempel igen"
-            >
-              Visa exempel igen
-            </button>
-          )}
-        </div>
+        <p key={announcement.key} style={styles.srOnly} role="status" aria-atomic="true">
+          {announcement.text}
+        </p>
       </div>
-    </div>
+    </main>
   );
 }
