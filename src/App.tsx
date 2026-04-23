@@ -162,6 +162,17 @@ function formatReply(
     return /^https?:\/\/\S+$/i.test(value.trim());
   }
 
+  function isStandaloneListHeading(value: string) {
+    const trimmedValue = value.trim();
+    return trimmedValue.endsWith(":") && trimmedValue.length <= 24;
+  }
+
+  function isContinuationBullet(value: string) {
+    return /^(App Store|Google Play|Läs mer|Mer info|Hemsida|Webbplats|Officiell länk|Länk)\b/i.test(
+      value.trim()
+    );
+  }
+
   function getLinkLabel(url: string) {
     const lower = url.toLowerCase();
     if (lower.includes("apps.apple.com")) return "App Store (iOS)";
@@ -319,7 +330,19 @@ function formatReply(
     if (bulletMatch) {
       const bulletValue = sanitizeInlineMarkdown(bulletMatch[1]);
 
-      if (isUrlOnlyLine(bulletValue) && appendToPreviousBlock(bulletValue)) {
+      if (isStandaloneListHeading(bulletValue)) {
+        blocks.push({
+          type: "heading",
+          value: bulletValue.replace(/:$/, "").trim(),
+        });
+        previousLineWasListItem = false;
+        continue;
+      }
+
+      if (
+        (isUrlOnlyLine(bulletValue) || isContinuationBullet(bulletValue)) &&
+        appendToPreviousBlock(bulletValue)
+      ) {
         previousLineWasListItem = true;
         continue;
       }
@@ -332,7 +355,19 @@ function formatReply(
     if (numberedMatch) {
       const numberedValue = sanitizeInlineMarkdown(numberedMatch[1]);
 
-      if (isUrlOnlyLine(numberedValue) && appendToPreviousBlock(numberedValue)) {
+      if (isStandaloneListHeading(numberedValue)) {
+        blocks.push({
+          type: "heading",
+          value: numberedValue.replace(/:$/, "").trim(),
+        });
+        previousLineWasListItem = false;
+        continue;
+      }
+
+      if (
+        (isUrlOnlyLine(numberedValue) || isContinuationBullet(numberedValue)) &&
+        appendToPreviousBlock(numberedValue)
+      ) {
         previousLineWasListItem = true;
         continue;
       }
