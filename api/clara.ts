@@ -49,6 +49,8 @@ Ge 1 till 3 konkreta exempel med länk när det är möjligt.
 Använd hela URL:er (https://...).
 Välj i första hand officiella länkar, till exempel appens officiella sida eller App Store/Google Play.
 Skriv tydligt vilken plattform länken gäller, till exempel: "App Store (iOS)" eller "Google Play (Android)".
+Låt varje app eller tjänst och dess länk vara i samma punkt eller samma rad.
+Lägg inte länken som en egen punkt eller på en egen rad utan sammanhang.
 
 Viktigt:
 Börja inte med avancerade hjälpmedel om telefonen kan räcka.

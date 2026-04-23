@@ -158,6 +158,10 @@ function formatReply(
   reply: string,
   styles: Record<string, CSSProperties>
 ) {
+  function isUrlOnlyLine(value: string) {
+    return /^https?:\/\/\S+$/i.test(value.trim());
+  }
+
   function getLinkLabel(url: string) {
     const lower = url.toLowerCase();
     if (lower.includes("apps.apple.com")) return "App Store (iOS)";
@@ -273,6 +277,28 @@ function formatReply(
     blocks.push({ type: "list", items: [item], ordered });
   }
 
+  function appendToPreviousBlock(value: string) {
+    const previousBlock = blocks[blocks.length - 1];
+
+    if (!previousBlock) {
+      return false;
+    }
+
+    if (previousBlock.type === "list" && previousBlock.items.length > 0) {
+      const lastItemIndex = previousBlock.items.length - 1;
+      previousBlock.items[lastItemIndex] =
+        `${previousBlock.items[lastItemIndex]} ${value}`.trim();
+      return true;
+    }
+
+    if (previousBlock.type === "paragraph") {
+      previousBlock.value = `${previousBlock.value} ${value}`.trim();
+      return true;
+    }
+
+    return false;
+  }
+
   for (const line of lines) {
     const cleanedLine = normalizeHeadingCandidate(line);
     const normalized = cleanedLine.toLowerCase();
@@ -291,18 +317,38 @@ function formatReply(
     }
 
     if (bulletMatch) {
-      pushListItem(sanitizeInlineMarkdown(bulletMatch[1]), false);
+      const bulletValue = sanitizeInlineMarkdown(bulletMatch[1]);
+
+      if (isUrlOnlyLine(bulletValue) && appendToPreviousBlock(bulletValue)) {
+        previousLineWasListItem = true;
+        continue;
+      }
+
+      pushListItem(bulletValue, false);
       previousLineWasListItem = true;
       continue;
     }
 
     if (numberedMatch) {
-      pushListItem(sanitizeInlineMarkdown(numberedMatch[1]), true);
+      const numberedValue = sanitizeInlineMarkdown(numberedMatch[1]);
+
+      if (isUrlOnlyLine(numberedValue) && appendToPreviousBlock(numberedValue)) {
+        previousLineWasListItem = true;
+        continue;
+      }
+
+      pushListItem(numberedValue, true);
       previousLineWasListItem = true;
       continue;
     }
 
     const sanitizedLine = sanitizeInlineMarkdown(line);
+
+    if (isUrlOnlyLine(sanitizedLine) && appendToPreviousBlock(sanitizedLine)) {
+      previousLineWasListItem = false;
+      continue;
+    }
+
     const previousBlock = blocks[blocks.length - 1];
 
     if (
