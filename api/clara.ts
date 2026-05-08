@@ -16,17 +16,12 @@ type ApiErrorCode =
   | "SERVICE_UNAVAILABLE"
   | "SERVER_ERROR";
 
-const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-const google = createGoogleGenerativeAI({
-  apiKey: googleApiKey,
-});
-
 const MAX_OUTPUT_TOKENS = 900;
 const MAX_CONTEXT_MESSAGES = 8;
 const MAX_CONTEXT_CHARS = 700;
 const MAX_LATEST_MESSAGE_CHARS = 1200;
 
-const CLARA_SYSTEM_PROMPT = `Du är Clara.
+const CLARA_SYSTEM_INSTRUCTION = `Du är Clara.
 
 Du hjälper personer med synnedsättning att lösa vardagsproblem med teknik.
 
@@ -89,7 +84,9 @@ Låt svaret kännas lugnt, enkelt och möjligt att testa direkt.
 Nämn aldrig språk för en app om det inte efterfrågas.
 Nämn språk endast om du är säker på att appen saknar svenska, och skriv då kort: "Finns inte på svenska."
 Om du är osäker på språkstöd, skriv inget om språk.
-Undvik detaljerade steg för steg instruktioner om knapptryckningar.`;
+Undvik detaljerade steg för steg instruktioner om knapptryckningar.
+Om extern sökning inte behövs ska du hålla dig till dina instruktioner och svara utan att hitta externa källor.
+Om extern sökning används ska du bara använda den för att hitta eller verifiera specifika länkar och aktuell information.`;
 
 function sendError(res: any, status: number, code: ApiErrorCode, reply: string) {
   res.setHeader("Cache-Control", "no-store");
@@ -103,6 +100,10 @@ function truncateText(value: string, limit: number) {
   }
 
   return `${trimmedValue.slice(0, limit).trimEnd()}...`;
+}
+
+function getGoogleApiKey() {
+  return process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() || "";
 }
 
 function normalizeMessages(input: unknown): ConversationMessage[] {
@@ -192,31 +193,36 @@ function shouldUseGoogleSearch(
     return false;
   }
 
-  const userMessageCount = messages.filter(
-    (message) => message.role === "user"
-  ).length;
   const asksForLinks =
-    /\b(länk|länkar|link|app store|google play|hemsida|webbplats|officiell|officiella|hämta|installera|ladda ner|download)\b/i.test(
+    /\b(länk|länkar|link|app store|google play|hemsida|webbplats|officiell|officiella|hämta|installera|ladda ner|download|url)\b/i.test(
       latestUserMessage
     );
   const asksForCurrentInfo =
     /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|vilken app finns)\b/i.test(
       latestUserMessage
     );
-  const asksForSpecificProducts =
-    /\b(app|appar|hjälpmedel|tjänst|tjänster|iphone|ios|android|samsung|voiceover|talkback|be my eyes|seeing ai|google lens)\b/i.test(
+  const asksForVerification =
+    /\b(sök|sök upp|kolla upp|kontrollera|verifiera|hitta)\b/i.test(
+      latestUserMessage
+    );
+  const asksForSpecificAppRecommendation =
+    /\b(vilken|vilka|någon|några|tips|förslag)\b[\s\S]{0,40}\b(app|appar|hjälpmedel|tjänst|tjänster)\b/i.test(
+      latestUserMessage
+    );
+  const namesSpecificProducts =
+    /\b(voiceover|talkback|be my eyes|seeing ai|google lens|envision|supersense|iphone|ios|android)\b/i.test(
       latestUserMessage
     );
 
-  if (asksForLinks || asksForCurrentInfo) {
+  if (asksForLinks || asksForCurrentInfo || asksForVerification) {
     return true;
   }
 
-  if (userMessageCount <= 1) {
-    return normalizedMessage.length >= 10;
+  if (asksForSpecificAppRecommendation && namesSpecificProducts) {
+    return true;
   }
 
-  return asksForSpecificProducts;
+  return false;
 }
 
 function collectErrorTexts(error: unknown, depth = 0): string[] {
@@ -316,16 +322,26 @@ function isTemporaryProviderError(error: unknown) {
 
 async function generateWithGoogle(
   prompt: string,
-  useSearch: boolean
+  useSearch: boolean,
+  apiKey: string
 ) {
+  const google = createGoogleGenerativeAI({
+    apiKey,
+  });
+
   const { text } = await generateText({
-    model: google("gemini-2.5-flash"),
-    system: CLARA_SYSTEM_PROMPT,
+    model: google("gemini-2.0-flash"),
+    // In AI SDK for Google, `system` is translated to Gemini `systemInstruction`.
+    system: CLARA_SYSTEM_INSTRUCTION,
     prompt,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     maxRetries: 0,
+    temperature: 0.1,
+    topP: 0.1,
+    topK: 1,
     providerOptions: {
       google: {
+        responseModalities: ["TEXT"],
         thinkingConfig: {
           thinkingBudget: 0,
         },
@@ -355,6 +371,8 @@ export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return sendError(res, 405, "INVALID_REQUEST", "Endast POST stöds.");
   }
+
+  const googleApiKey = getGoogleApiKey();
 
   if (!googleApiKey) {
     return sendError(
@@ -393,7 +411,7 @@ export default async function handler(req: any, res: any) {
   const useSearch = shouldUseGoogleSearch(normalizedMessages, latestUserMessage);
 
   try {
-    const reply = await generateWithGoogle(prompt, useSearch);
+    const reply = await generateWithGoogle(prompt, useSearch, googleApiKey);
     return res.status(200).json({ reply });
   } catch (error) {
     console.error("Clara Google error:", error);
