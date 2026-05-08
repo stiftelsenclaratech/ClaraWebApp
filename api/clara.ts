@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 type ConversationRole = "user" | "assistant";
 
@@ -8,16 +8,34 @@ type ConversationMessage = {
   content: string;
 };
 
+type ApiErrorCode =
+  | "INVALID_REQUEST"
+  | "BUDGET_EXCEEDED"
+  | "RATE_LIMITED"
+  | "MISCONFIGURED"
+  | "SERVICE_UNAVAILABLE"
+  | "SERVER_ERROR";
+
+const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+const google = createGoogleGenerativeAI({
+  apiKey: googleApiKey,
+});
+
+const MAX_OUTPUT_TOKENS = 900;
+const MAX_CONTEXT_MESSAGES = 8;
+const MAX_CONTEXT_CHARS = 700;
+const MAX_LATEST_MESSAGE_CHARS = 1200;
+
 const CLARA_SYSTEM_PROMPT = `Du är Clara.
 
 Du hjälper personer med synnedsättning att lösa vardagsproblem med teknik.
 
 Regler:
 Språket ska vara korrekt och bra svenska med rätt benämningar.
-Ge alltid ett enkelt och vardagsnära första förslag som användaren själv kan testa direkt.
-Börja helst med sådant som redan finns i användarens telefon.
-Prioritera telefonen först när det är möjligt.
-Prioritera i första hand inbyggda funktioner som röstassistent, OCR/textigenkänning, förstorare och uppläsning.
+Ge alltid ett första förslag som är det enklaste som faktiskt fungerar för användarens problem.
+Det första förslaget får vara antingen en inbyggd funktion eller en app, beroende på vad som är enklast och mest användbart i praktiken.
+Välj inte inbyggda funktioner bara för att de är inbyggda om en enkel app är ett bättre första val.
+Prioritera lösningar som användaren själv kan testa direkt i vardagen.
 Ge alltid teknikförslag.
 Undvik allmänna råd utan teknik.
 Undvik långa förklaringar.
@@ -45,8 +63,8 @@ Problem
 Kort tolkning av vad användaren vill lösa just nu.
 
 Första steg
-Det enklaste och mest vardagsnära teknikförslaget.
-Det ska i första hand vara en inbyggd funktion i telefonen (röstassistent, OCR/textigenkänning, förstorare eller uppläsning) när det går.
+Det enklaste teknikförslaget som faktiskt fungerar för problemet.
+Det får vara en inbyggd funktion i telefonen eller en app, beroende på vad som är enklast och mest hjälpsamt.
 
 Fler möjligheter
 2 till 3 korta idéer.
@@ -72,6 +90,20 @@ Nämn aldrig språk för en app om det inte efterfrågas.
 Nämn språk endast om du är säker på att appen saknar svenska, och skriv då kort: "Finns inte på svenska."
 Om du är osäker på språkstöd, skriv inget om språk.
 Undvik detaljerade steg för steg instruktioner om knapptryckningar.`;
+
+function sendError(res: any, status: number, code: ApiErrorCode, reply: string) {
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(status).json({ code, reply });
+}
+
+function truncateText(value: string, limit: number) {
+  const trimmedValue = value.trim();
+  if (trimmedValue.length <= limit) {
+    return trimmedValue;
+  }
+
+  return `${trimmedValue.slice(0, limit).trimEnd()}...`;
+}
 
 function normalizeMessages(input: unknown): ConversationMessage[] {
   if (!Array.isArray(input)) {
@@ -108,7 +140,22 @@ function buildPrompt(messages: ConversationMessage[], latestUserMessage: string)
     (message) => message.role === "user"
   ).length;
   const isFirstQuestion = userMessageCount <= 1;
-  const conversationContext = messages
+  const contextMessages = messages
+    .slice(-MAX_CONTEXT_MESSAGES)
+    .map((message, index, slicedMessages) => {
+      const isLatestMessage = index === slicedMessages.length - 1;
+      const limit =
+        message.role === "user" && isLatestMessage
+          ? MAX_LATEST_MESSAGE_CHARS
+          : MAX_CONTEXT_CHARS;
+
+      return {
+        ...message,
+        content: truncateText(message.content, limit),
+      };
+    });
+
+  const conversationContext = contextMessages
     .map((message) => {
       const speaker = message.role === "assistant" ? "Clara" : "Användaren";
       return `${speaker}: ${message.content}`;
@@ -121,62 +168,204 @@ Samtalet hittills:
 ${conversationContext}
 
 Användarens senaste meddelande:
-${latestUserMessage}
+${truncateText(latestUserMessage, MAX_LATEST_MESSAGE_CHARS)}
 
 Svara nu som Clara.
 ${isFirstQuestion ? "Använd den fasta strukturen för första svaret." : "Svara friare och direkt på följdfrågan utan att tvinga in svaret i den fasta första-svarsstrukturen."}`;
 }
 
-async function generateWithGoogle(prompt: string) {
+function shouldUseGoogleSearch(
+  messages: ConversationMessage[],
+  latestUserMessage: string
+) {
+  const normalizedMessage = latestUserMessage.trim().toLowerCase();
+
+  if (!normalizedMessage) {
+    return false;
+  }
+
+  if (
+    /^(hej|hejsan|hallå|god morgon|god kväll|tack|tusen tack|toppen|super|bra|okej|ok|ja|nej|mm+|japp|näpp)([.!? ]+)?$/i.test(
+      normalizedMessage
+    )
+  ) {
+    return false;
+  }
+
+  const userMessageCount = messages.filter(
+    (message) => message.role === "user"
+  ).length;
+  const asksForLinks =
+    /\b(länk|länkar|link|app store|google play|hemsida|webbplats|officiell|officiella|hämta|installera|ladda ner|download)\b/i.test(
+      latestUserMessage
+    );
+  const asksForCurrentInfo =
+    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|vilken app finns)\b/i.test(
+      latestUserMessage
+    );
+  const asksForSpecificProducts =
+    /\b(app|appar|hjälpmedel|tjänst|tjänster|iphone|ios|android|samsung|voiceover|talkback|be my eyes|seeing ai|google lens)\b/i.test(
+      latestUserMessage
+    );
+
+  if (asksForLinks || asksForCurrentInfo) {
+    return true;
+  }
+
+  if (userMessageCount <= 1) {
+    return normalizedMessage.length >= 10;
+  }
+
+  return asksForSpecificProducts;
+}
+
+function collectErrorTexts(error: unknown, depth = 0): string[] {
+  if (error == null || depth > 4) {
+    return [];
+  }
+
+  if (typeof error === "string") {
+    return [error];
+  }
+
+  if (error instanceof Error) {
+    return [
+      error.message,
+      ...collectErrorTexts((error as Error & { cause?: unknown }).cause, depth + 1),
+    ];
+  }
+
+  if (typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const texts: string[] = [];
+
+    for (const key of ["message", "statusText", "details", "code"]) {
+      const value = record[key];
+      if (typeof value === "string") {
+        texts.push(value);
+      }
+    }
+
+    for (const key of ["cause", "error", "response", "body", "data"]) {
+      texts.push(...collectErrorTexts(record[key], depth + 1));
+    }
+
+    return texts;
+  }
+
+  return [];
+}
+
+function getErrorStatusCode(error: unknown): number | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const record = error as Record<string, unknown>;
+
+  for (const key of ["statusCode", "status"]) {
+    const value = record[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  for (const key of ["cause", "error", "response", "body", "data"]) {
+    const nestedStatusCode = getErrorStatusCode(record[key]);
+    if (nestedStatusCode !== null) {
+      return nestedStatusCode;
+    }
+  }
+
+  return null;
+}
+
+function isBudgetExceededError(error: unknown) {
+  const statusCode = getErrorStatusCode(error);
+  const normalizedText = collectErrorTexts(error).join(" ").toLowerCase();
+
+  return (
+    statusCode === 429 ||
+    ((statusCode === 403 || statusCode === 400) &&
+      /(resource[_ -]?exhausted|quota|billing|budget|rate limit|too many requests)/i.test(
+        normalizedText
+      ))
+  );
+}
+
+function isTemporaryProviderError(error: unknown) {
+  const statusCode = getErrorStatusCode(error);
+
+  return (
+    statusCode === 408 ||
+    statusCode === 425 ||
+    statusCode === 500 ||
+    statusCode === 502 ||
+    statusCode === 503 ||
+    statusCode === 504
+  );
+}
+
+async function generateWithGoogle(
+  prompt: string,
+  useSearch: boolean
+) {
   const { text } = await generateText({
     model: google("gemini-2.5-flash"),
     system: CLARA_SYSTEM_PROMPT,
-    tools: {
-      google_search: google.tools.googleSearch({
-        searchTypes: { webSearch: {} },
-      }),
-    },
     prompt,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+    maxRetries: 0,
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
+    },
+    ...(useSearch
+      ? {
+          tools: {
+            google_search: google.tools.googleSearch({
+              searchTypes: { webSearch: {} },
+            }),
+          },
+          activeTools: ["google_search"] as const,
+          toolChoice: "auto" as const,
+        }
+      : {
+          toolChoice: "none" as const,
+        }),
   });
 
   return text || "Fick inget svar.";
 }
 
-async function generateWithOpenAI(prompt: string) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      input: `${CLARA_SYSTEM_PROMPT}
+export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
 
-${prompt}`,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI request failed with status ${response.status}`);
+  if (req.method !== "POST") {
+    return sendError(res, 405, "INVALID_REQUEST", "Endast POST stöds.");
   }
 
-  const data = await response.json();
-
-  return (
-    data?.output_text ||
-    data?.output?.[0]?.content?.[0]?.text ||
-    "Fick inget svar."
-  );
-}
-
-export default async function handler(req: any, res: any) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ reply: "Method not allowed" });
+  if (!googleApiKey) {
+    return sendError(
+      res,
+      500,
+      "MISCONFIGURED",
+      "Tjänsten är inte korrekt konfigurerad."
+    );
   }
 
   const { problem, messages } = req.body ?? {};
-
   const normalizedMessages = normalizeMessages(messages);
 
   if (!normalizedMessages.length && typeof problem === "string" && problem.trim()) {
@@ -192,38 +381,46 @@ export default async function handler(req: any, res: any) {
     ?.content;
 
   if (!latestUserMessage) {
-    return res
-      .status(400)
-      .json({ reply: "Beskriv ditt problem kort så hjälper jag dig." });
+    return sendError(
+      res,
+      400,
+      "INVALID_REQUEST",
+      "Beskriv ditt problem kort så hjälper jag dig."
+    );
   }
 
   const prompt = buildPrompt(normalizedMessages, latestUserMessage);
+  const useSearch = shouldUseGoogleSearch(normalizedMessages, latestUserMessage);
 
   try {
-    if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      try {
-        const reply = await generateWithGoogle(prompt);
-        return res.status(200).json({ reply });
-      } catch (error) {
-        console.error("Clara Google error:", error);
-      }
-    }
-
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        const reply = await generateWithOpenAI(prompt);
-        return res.status(200).json({ reply });
-      } catch (error) {
-        console.error("Clara OpenAI error:", error);
-      }
-    }
-
-    throw new Error("No working AI provider configured.");
+    const reply = await generateWithGoogle(prompt, useSearch);
+    return res.status(200).json({ reply });
   } catch (error) {
-    console.error("Clara error:", error);
+    console.error("Clara Google error:", error);
 
-    return res.status(500).json({
-      reply: "Kunde inte hämta svar just nu.",
-    });
+    if (isBudgetExceededError(error)) {
+      return sendError(
+        res,
+        429,
+        "BUDGET_EXCEEDED",
+        "Stiftelsens budget för denna månad har uppnåtts. Försök igen senare."
+      );
+    }
+
+    if (isTemporaryProviderError(error)) {
+      return sendError(
+        res,
+        503,
+        "SERVICE_UNAVAILABLE",
+        "Clara är tillfälligt hårt belastad. Försök igen om en stund."
+      );
+    }
+
+    return sendError(
+      res,
+      500,
+      "SERVER_ERROR",
+      "Kunde inte hämta svar just nu."
+    );
   }
 }

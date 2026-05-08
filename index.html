@@ -9,10 +9,49 @@
     <link rel="manifest" href="/site.webmanifest" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#4f46e5" />
+    <meta name="theme-color" content="#34225C" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Clara" />
+
+    <script>
+      function startEmbedHeightObserver() {
+        if (!window.parent || window.parent === window) {
+          return;
+        }
+
+        function getEmbedHeight() {
+          return Math.max(
+            document.body.getBoundingClientRect().height,
+            document.documentElement.getBoundingClientRect().height,
+            document.documentElement.scrollHeight
+          );
+        }
+
+        function postEmbedHeight(height) {
+          window.parent.postMessage(
+            { type: "embed-height", height: Math.ceil(height) },
+            "*"
+          );
+        }
+
+        postEmbedHeight(getEmbedHeight());
+
+        const observer = new ResizeObserver(function (entries) {
+          for (const entry of entries) {
+            postEmbedHeight(Math.max(entry.contentRect.height, getEmbedHeight()));
+          }
+        });
+
+        observer.observe(document.body);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", startEmbedHeightObserver);
+      } else {
+        startEmbedHeightObserver();
+      }
+    </script>
 
     <title>Clara</title>
   </head>
