@@ -11,7 +11,6 @@ type ConversationMessage = {
 type ApiErrorCode =
   | "INVALID_REQUEST"
   | "BUDGET_EXCEEDED"
-  | "RATE_LIMITED"
   | "MISCONFIGURED"
   | "SERVICE_UNAVAILABLE"
   | "SERVER_ERROR";

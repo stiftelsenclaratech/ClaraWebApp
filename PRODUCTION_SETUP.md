@@ -28,6 +28,10 @@ clara-public-api
 
 Create the rule in the new Vercel account and apply it to `POST /api/clara`.
 
+There is no app-side request counter anymore.
+
+Clara relies on the Vercel Firewall rule alone for public request rate limiting.
+
 Suggested starting limit:
 
 - 12 requests per 10 minutes per IP
