@@ -395,8 +395,12 @@ function shouldUseGoogleSearch(
     /\b(vilken|vilka|någon|några|tips|förslag)\b[\s\S]{0,40}\b(app|appar|hjälpmedel|tjänst|tjänster)\b/i.test(
       latestUserMessage
     );
-  const namesSpecificProducts =
-    /\b(voiceover|talkback|be my eyes|seeing ai|google lens|envision|supersense|iphone|ios|android)\b/i.test(
+  const namesSpecificApp =
+    /\b(voiceover|talkback|be my eyes|seeing ai|google lens|envision|supersense|lookout|aira|orcam)\b/i.test(
+      latestUserMessage
+    );
+  const describesEverydayProblem =
+    /\b(läsa|se|höra|skriva|navigera|hitta|identifiera|känna igen|förstå|använda|öppna|ringa|betala|handla|zooma|förstora|tillgänglig)\b/i.test(
       latestUserMessage
     );
 
@@ -404,7 +408,11 @@ function shouldUseGoogleSearch(
     return true;
   }
 
-  if (asksForSpecificAppRecommendation && namesSpecificProducts) {
+  if (asksForSpecificAppRecommendation) {
+    return true;
+  }
+
+  if ((namesSpecificApp || describesEverydayProblem) && isFirstQuestion(messages)) {
     return true;
   }
 
@@ -423,10 +431,6 @@ function shouldUseGoogleSearchForCurrentRequest(
 
   if (TRIVIAL_USER_MESSAGE_PATTERN.test(normalizedMessage)) {
     return false;
-  }
-
-  if (isFirstQuestion(messages)) {
-    return true;
   }
 
   return shouldUseGoogleSearch(messages, latestUserMessage);
