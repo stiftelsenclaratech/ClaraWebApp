@@ -209,10 +209,11 @@ const CURRENT_CLARA_SYSTEM_INSTRUCTION = [
   "",
   "Teknik",
   "Lista bara konkreta appar eller funktioner som redan n\u00e4mnts i svaret.",
-  "F\u00f6r appar ska varje rad ha formatet: Namn, Plattform, https://...",
-  "Om samma app finns f\u00f6r flera plattformar ska du skriva appen p\u00e5 en enda rad och l\u00e4gga plattformar och l\u00e4nkar efter varandra i samma rad.",
-  "Anv\u00e4nd hela URL:er och officiella l\u00e4nkar.",
-  "N\u00e4r du l\u00e4nkar till App Store eller Google Play ska du anv\u00e4nda den direkta appsidan f\u00f6r just appen.",
+  "Kontrollera alltid via s\u00f6kning om appen finns f\u00f6r iOS (App Store) och Android (Google Play) innan du rekommenderar den.",
+  "F\u00f6r appar ska varje rad ha formatet: Namn https://apps.apple.com/... https://play.google.com/...",
+  "Skriv appnamnet direkt f\u00f6ljt av URL:erna. Inga plattformsnamn som iOS eller Android beh\u00f6vs i texten.",
+  "Om appen bara finns f\u00f6r en plattform, skriv bara den plattformens URL.",
+  "Anv\u00e4nd hela URL:er och officiella direktl\u00e4nkar till appen.",
   "Skriv ingen extra beskrivning under l\u00e4nkarna.",
   "",
   "Viktigt:",
@@ -422,11 +423,7 @@ function shouldUseGoogleSearchForCurrentRequest(
     return false;
   }
 
-  if (isFirstQuestion(messages)) {
-    return true;
-  }
-
-  return shouldUseGoogleSearch(messages, latestUserMessage);
+  return true;
 }
 
 function shouldUseGoogleSearchForExactLinksOrVersions(

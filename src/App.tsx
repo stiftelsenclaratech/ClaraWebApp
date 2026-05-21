@@ -231,8 +231,8 @@ function formatReply(
 
   function getLinkLabel(url: string) {
     const lower = url.toLowerCase();
-    if (lower.includes("apps.apple.com")) return "App Store (iOS)";
-    if (lower.includes("play.google.com")) return "Google Play (Android)";
+    if (lower.includes("apps.apple.com")) return "iOS";
+    if (lower.includes("play.google.com")) return "Android";
     if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "YouTube";
     if (lower.includes("support.apple.com")) return "Apple Support";
     if (lower.includes("support.google.com")) return "Google Support";
@@ -255,18 +255,7 @@ function formatReply(
         return part;
       }
 
-      const generatedLabel = getLinkLabel(part);
-      const previousText = parts[index - 1] ?? "";
-      let linkText = generatedLabel;
-
-      if (previousText.includes(generatedLabel)) {
-        try {
-          const parsedUrl = new URL(part);
-          linkText = parsedUrl.hostname.replace(/^www\./, "");
-        } catch {
-          linkText = "Länk";
-        }
-      }
+      const linkText = getLinkLabel(part);
 
       return (
         <a
@@ -275,7 +264,7 @@ function formatReply(
           target={getLinkTarget(part)}
           rel="noreferrer noopener"
           style={styles.replyLink}
-          aria-label={`Öppna länk: ${generatedLabel}`}
+          aria-label={`Öppna länk: ${linkText}`}
         >
           {linkText}
         </a>
