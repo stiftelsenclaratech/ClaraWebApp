@@ -1108,7 +1108,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
-  const [textSizeStep, setTextSizeStep] = useState(1);
+  const [textSizeStep, setTextSizeStep] = useState(2);
   const [menuOpen, setMenuOpen] = useState(false);
   const [announcement, setAnnouncement] = useState<AnnouncementState>({
     key: 0,
