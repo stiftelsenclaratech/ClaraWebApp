@@ -273,7 +273,7 @@ function formatReply(
   }
 
   function renderLineContent(value: string): ReactNode {
-    if (/^https?:\/\//i.test(value.trim())) {
+    if (/https?:\/\//i.test(value)) {
       return <>{renderTextWithLinks(value)}</>;
     }
 
