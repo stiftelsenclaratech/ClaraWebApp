@@ -22,7 +22,7 @@ export default async function middleware(request: Request) {
         {
           code: "RATE_LIMITED",
           reply:
-            "För många frågor har skickats från samma anslutning. Vänta en stund och försök igen.",
+            "Antalet f\u00f6rfr\u00e5gningar har n\u00e5tt sin gr\u00e4ns just nu. F\u00f6rs\u00f6k igen om 10 minuter.",
         },
         {
           status: 429,

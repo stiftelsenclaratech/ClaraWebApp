@@ -44,11 +44,31 @@ type AnnouncementState = {
   text: string;
 };
 
+const PRODUCTION_API_ORIGIN = "https://clara-webapp-gemini.vercel.app";
+
+function getClaraApiUrl() {
+  const configuredApiBaseUrl = import.meta.env.VITE_CLARA_API_BASE_URL?.trim();
+
+  if (configuredApiBaseUrl) {
+    return `${configuredApiBaseUrl.replace(/\/+$/, "")}/api/clara`;
+  }
+
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location;
+
+    if (hostname === "127.0.0.1" || hostname === "localhost") {
+      return `${PRODUCTION_API_ORIGIN}/api/clara`;
+    }
+  }
+
+  return "/api/clara";
+}
+
 async function postClaraRequest(body: {
   problem: string;
   messages?: ApiConversationMessage[];
 }) {
-  return fetch("/api/clara", {
+  return fetch(getClaraApiUrl(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -105,7 +125,7 @@ async function getClaraReplyFromAPI(
       }
 
       if (response.status === 429) {
-        return "För många förfrågningar just nu. Vänta en stund och försök igen.";
+        return "Antalet f\u00f6rfr\u00e5gningar har n\u00e5tt sin gr\u00e4ns just nu. F\u00f6rs\u00f6k igen om 10 minuter.";
       }
 
       if (response.status === 503) {
@@ -166,30 +186,32 @@ function formatReply(
   reply: string,
   styles: Record<string, CSSProperties>
 ) {
-  function isAppStoreUrl(url: string) {
+  function isStoreUrl(url: string) {
     try {
       const parsed = new URL(url);
-      return parsed.hostname === "apps.apple.com";
+      return (
+        parsed.hostname === "apps.apple.com" ||
+        parsed.hostname === "play.google.com"
+      );
     } catch {
       return false;
     }
   }
 
   function getLinkHref(url: string) {
-    if (!isAppStoreUrl(url)) {
-      return url;
-    }
-
-    try {
-      const parsed = new URL(url);
-      return `itms-apps://${parsed.host}${parsed.pathname}${parsed.search}`;
-    } catch {
-      return url;
-    }
+    return url;
   }
 
   function getLinkTarget(url: string) {
-    return isAppStoreUrl(url) ? "_self" : "_blank";
+    if (
+      isStoreUrl(url) &&
+      typeof window !== "undefined" &&
+      window.self !== window.top
+    ) {
+      return "_top";
+    }
+
+    return "_blank";
   }
 
   function isUrlOnlyLine(value: string) {
@@ -233,6 +255,19 @@ function formatReply(
         return part;
       }
 
+      const generatedLabel = getLinkLabel(part);
+      const previousText = parts[index - 1] ?? "";
+      let linkText = generatedLabel;
+
+      if (previousText.includes(generatedLabel)) {
+        try {
+          const parsedUrl = new URL(part);
+          linkText = parsedUrl.hostname.replace(/^www\./, "");
+        } catch {
+          linkText = "Länk";
+        }
+      }
+
       return (
         <a
           key={`${part}-${index}`}
@@ -240,9 +275,9 @@ function formatReply(
           target={getLinkTarget(part)}
           rel="noreferrer noopener"
           style={styles.replyLink}
-          aria-label={`Öppna länk: ${getLinkLabel(part)}`}
+          aria-label={`Öppna länk: ${generatedLabel}`}
         >
-          {getLinkLabel(part)}
+          {linkText}
         </a>
       );
     });
@@ -289,7 +324,77 @@ function formatReply(
     "Bra att veta",
   ];
 
-  const lines = reply.split("\n").map((line) => line.trim()).filter(Boolean);
+  function getTechniqueAppKey(value: string) {
+    const trimmedValue = value.trim();
+    if (!trimmedValue.includes("http")) {
+      return null;
+    }
+
+    const firstCommaIndex = trimmedValue.indexOf(",");
+    if (firstCommaIndex <= 0) {
+      return null;
+    }
+
+    const appName = trimmedValue.slice(0, firstCommaIndex).trim();
+    if (!appName || /^https?:\/\//i.test(appName)) {
+      return null;
+    }
+
+    return appName.toLowerCase();
+  }
+
+  function mergeTechniqueLineValues(previousValue: string, nextValue: string) {
+    const previousAppKey = getTechniqueAppKey(previousValue);
+    const nextAppKey = getTechniqueAppKey(nextValue);
+
+    if (!previousAppKey || previousAppKey !== nextAppKey) {
+      return null;
+    }
+
+    const nextRemainder = nextValue.slice(nextValue.indexOf(",") + 1).trim();
+    if (!nextRemainder) {
+      return null;
+    }
+
+    return `${previousValue} och ${nextRemainder}`;
+  }
+
+  const rawLines = reply.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines: string[] = [];
+  let insideTechniqueSection = false;
+
+  for (const line of rawLines) {
+    const normalizedHeading = normalizeHeadingCandidate(line).toLowerCase();
+    const isTechniqueHeading = normalizedHeading === "teknik";
+    const isKnownHeading = headingLines.some(
+      (heading) => normalizedHeading === heading.toLowerCase()
+    );
+
+    if (isTechniqueHeading) {
+      insideTechniqueSection = true;
+      lines.push(line);
+      continue;
+    }
+
+    if (insideTechniqueSection && isKnownHeading) {
+      insideTechniqueSection = false;
+    }
+
+    if (insideTechniqueSection && lines.length > 0) {
+      const mergedTechniqueLine = mergeTechniqueLineValues(
+        lines[lines.length - 1],
+        line
+      );
+
+      if (mergedTechniqueLine) {
+        lines[lines.length - 1] = mergedTechniqueLine;
+        continue;
+      }
+    }
+
+    lines.push(line);
+  }
+
   const blocks: Array<
     | { type: "heading"; value: string }
     | { type: "subheading"; value: string }
@@ -659,14 +764,14 @@ function createStyles(
     },
     topBar: {
       display: "grid",
-      gridTemplateColumns: "48px minmax(0, 1fr) 48px",
+      gridTemplateColumns: "56px minmax(0, 1fr) 56px",
       alignItems: "start",
       marginBottom: 28,
       columnGap: 12,
     },
     topSpacer: {
-      width: 48,
-      height: 48,
+      width: 56,
+      height: 56,
     },
     centerLogo: {
       justifySelf: "center",
@@ -677,7 +782,7 @@ function createStyles(
     },
     logo: {
       width: "100%",
-      maxWidth: 240,
+      maxWidth: 252,
       display: "block",
     },
     menuWrap: {
@@ -685,9 +790,9 @@ function createStyles(
       position: "relative",
     },
     menuButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 16,
+      width: 56,
+      height: 56,
+      borderRadius: 18,
       border: borderColor,
       background: actionSurface,
       cursor: "pointer",
@@ -698,14 +803,14 @@ function createStyles(
     },
     menuPanel: {
       position: "absolute",
-      top: 56,
+      top: 64,
       right: 0,
-      width: 248,
+      width: 272,
       background: menuBackground,
       border: borderColor,
       borderRadius: 20,
       boxShadow: buttonShadow,
-      padding: 16,
+      padding: 18,
       zIndex: 20,
       textAlign: "left",
     },
@@ -715,7 +820,7 @@ function createStyles(
       gap: 10,
     },
     panelLabel: {
-      fontSize: 13 * scale,
+      fontSize: 15 * scale,
       fontWeight: 700,
       color: headingColor,
       letterSpacing: "0.02em",
@@ -737,16 +842,16 @@ function createStyles(
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
+      gap: 10,
       width: "100%",
-      padding: "12px 10px",
+      padding: "14px 12px",
       borderRadius: 14,
       border: borderColor,
       background: actionSurface,
       color: mainText,
       cursor: "pointer",
       textAlign: "center",
-      fontSize: 14 * scale,
+      fontSize: 16 * scale,
       fontWeight: 700,
     },
     themeOptionActive: {
@@ -758,9 +863,9 @@ function createStyles(
       gap: 10,
     },
     sizeButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 16,
+      width: 56,
+      height: 56,
+      borderRadius: 18,
       border: borderColor,
       background: actionSurface,
       color: mainText,
@@ -774,14 +879,14 @@ function createStyles(
       padding: 0,
     },
     smallT: {
-      fontSize: `${clamp(12 + textSizeStep * 2, 10, 24)}px`,
+      fontSize: `${clamp(14 + textSizeStep * 2, 12, 26)}px`,
     },
     largeT: {
-      fontSize: `${clamp(20 + textSizeStep * 3, 14, 40)}px`,
+      fontSize: `${clamp(24 + textSizeStep * 3, 18, 44)}px`,
     },
     intro: {
       maxWidth: 32 * 16,
-      fontSize: 18 * scale,
+      fontSize: 22 * scale,
       lineHeight: 1.6,
       color: mutedText,
       margin: "0 auto 28px",
@@ -789,7 +894,7 @@ function createStyles(
     },
     label: {
       display: "block",
-      fontSize: 15 * scale,
+      fontSize: 17 * scale,
       fontWeight: 700,
       marginBottom: 12,
       color: headingColor,
@@ -798,11 +903,11 @@ function createStyles(
     },
     textarea: {
       width: "100%",
-      minHeight: 132,
-      padding: 18,
+      minHeight: 144,
+      padding: 20,
       borderRadius: 20,
       border: borderColor,
-      fontSize: 17 * scale,
+      fontSize: 20 * scale,
       lineHeight: 1.6,
       boxSizing: "border-box",
       resize: "vertical",
@@ -814,12 +919,12 @@ function createStyles(
     },
     primaryButton: {
       width: "100%",
-      padding: "15px 18px",
+      padding: "17px 20px",
       borderRadius: 18,
       border: `1px solid ${CLARA_VIOLET}`,
       background: CLARA_VIOLET,
       color: CLARA_WHITE,
-      fontSize: 16 * scale,
+      fontSize: 18 * scale,
       fontWeight: 700,
       cursor: "pointer",
       boxShadow: buttonShadow,
@@ -833,7 +938,7 @@ function createStyles(
       marginTop: 24,
     },
     examplesTitle: {
-      fontSize: 14 * scale,
+      fontSize: 16 * scale,
       fontWeight: 700,
       color: headingColor,
       marginBottom: 12,
@@ -846,20 +951,20 @@ function createStyles(
       justifyContent: "center",
     },
     chip: {
-      padding: "10px 14px",
+      padding: "12px 16px",
       borderRadius: 999,
       border: subtleBorder,
       background: chipSurface,
       color: mainText,
       cursor: "pointer",
-      fontSize: 14 * scale,
+      fontSize: 16 * scale,
       lineHeight: 1.45,
     },
     answerBox: {
       marginTop: 24,
       background: panelBackground,
       borderRadius: 24,
-      padding: 22,
+      padding: 26,
       textAlign: "left",
       border: subtleBorder,
     },
@@ -879,19 +984,19 @@ function createStyles(
     },
     secondaryButton: {
       width: "100%",
-      padding: "13px 16px",
+      padding: "15px 18px",
       borderRadius: 18,
       border: borderColor,
       background: actionSurface,
       color: mainText,
-      fontSize: 15 * scale,
+      fontSize: 17 * scale,
       fontWeight: 700,
       cursor: "pointer",
       letterSpacing: "0.01em",
     },
     replyHeading: {
       margin: "20px 0 8px 0",
-      fontSize: 20 * scale,
+      fontSize: 24 * scale,
       fontWeight: 700,
       color: headingColor,
       lineHeight: 1.35,
@@ -899,7 +1004,7 @@ function createStyles(
     },
     replySubheading: {
       margin: "16px 0 6px 0",
-      fontSize: 17 * scale,
+      fontSize: 20 * scale,
       fontWeight: 700,
       color: accentColor,
       lineHeight: 1.4,
@@ -909,14 +1014,14 @@ function createStyles(
       margin: "0 0 14px 0",
       lineHeight: 1.7,
       color: mainText,
-      fontSize: 16 * scale,
+      fontSize: 19 * scale,
       letterSpacing: "0.01em",
     },
     replyList: {
       margin: "0 0 14px 0",
       paddingLeft: 24,
       color: mainText,
-      fontSize: 16 * scale,
+      fontSize: 19 * scale,
       lineHeight: 1.7,
       letterSpacing: "0.01em",
     },
@@ -939,12 +1044,12 @@ function createStyles(
     userBubble: {
       alignSelf: "flex-end",
       maxWidth: "88%",
-      padding: "16px 18px",
+      padding: "18px 20px",
       borderRadius: 22,
       border: "none",
       background: userBubbleBackground,
       color: userBubbleText,
-      fontSize: 16 * scale,
+      fontSize: 18 * scale,
       lineHeight: 1.6,
       whiteSpace: "pre-wrap",
       wordBreak: "break-word",
@@ -953,7 +1058,7 @@ function createStyles(
     thinkingText: {
       margin: 0,
       color: softText,
-      fontSize: 16 * scale,
+      fontSize: 18 * scale,
       lineHeight: 1.6,
     },
     conversationForm: {
@@ -966,11 +1071,11 @@ function createStyles(
     },
     conversationTextarea: {
       width: "100%",
-      minHeight: 104,
-      padding: 18,
+      minHeight: 120,
+      padding: 20,
       borderRadius: 20,
       border: borderColor,
-      fontSize: 16 * scale,
+      fontSize: 19 * scale,
       lineHeight: 1.6,
       boxSizing: "border-box",
       resize: "vertical",
@@ -992,7 +1097,7 @@ function createStyles(
     },
     messageFeedback: {
       margin: "2px 0 0 0",
-      fontSize: 13 * scale,
+      fontSize: 15 * scale,
       lineHeight: 1.5,
       color: softText,
     },
@@ -1016,7 +1121,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
-  const [textSizeStep, setTextSizeStep] = useState(0);
+  const [textSizeStep, setTextSizeStep] = useState(1);
   const [menuOpen, setMenuOpen] = useState(false);
   const [announcement, setAnnouncement] = useState<AnnouncementState>({
     key: 0,
@@ -1382,7 +1487,7 @@ export default function App() {
               aria-expanded={menuOpen}
               title="Inställningar"
             >
-              <MenuIcon size={22} color={themeIconColor} />
+              <MenuIcon size={26} color={themeIconColor} />
             </button>
 
             {menuOpen && (
@@ -1432,7 +1537,7 @@ export default function App() {
                         >
                           <ThemePreviewIcon
                             mode={mode}
-                            size={20}
+                            size={22}
                             color={
                               themeMode === "dark" && themeMode === mode
                                 ? CLARA_YELLOW
