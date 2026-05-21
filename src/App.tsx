@@ -1050,6 +1050,12 @@ function createStyles(
       gap: 12,
       borderTop: subtleBorder,
     },
+    conversationHint: {
+      margin: 0,
+      fontSize: 16 * scale,
+      lineHeight: 1.5,
+      color: mutedText,
+    },
     conversationTextarea: {
       width: "100%",
       minHeight: 120,
@@ -1666,6 +1672,10 @@ export default function App() {
               aria-label="Fortsätt samtalet"
               style={styles.conversationForm}
             >
+              <p style={styles.conversationHint}>
+                Har du fler frågor? Skriv dem nedan. Du kan också spara eller dela samtalet, eller börja om med en ny fråga.
+              </p>
+
               <textarea
                 id="clara-problem"
                 value={problem}
