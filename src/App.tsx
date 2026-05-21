@@ -919,7 +919,7 @@ function createStyles(
       marginTop: 24,
     },
     examplesTitle: {
-      fontSize: 16 * scale,
+      fontSize: 20 * scale,
       fontWeight: 700,
       color: headingColor,
       marginBottom: 12,
@@ -932,13 +932,13 @@ function createStyles(
       justifyContent: "center",
     },
     chip: {
-      padding: "12px 16px",
+      padding: "14px 20px",
       borderRadius: 999,
       border: subtleBorder,
       background: chipSurface,
       color: mainText,
       cursor: "pointer",
-      fontSize: 16 * scale,
+      fontSize: 19 * scale,
       lineHeight: 1.45,
     },
     answerBox: {
