@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/clara.ts": {
+      "maxDuration": 30
+    }
+  }
+}
