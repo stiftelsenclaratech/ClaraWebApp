@@ -1565,6 +1565,12 @@ export default function App() {
                 id="clara-problem"
                 value={problem}
                 onChange={(event) => setProblem(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    if (canSubmit) void handleSubmit();
+                  }
+                }}
                 placeholder="Till exempel: Jag kan inte läsa min post"
                 style={styles.textarea}
                 aria-label="Beskriv ditt problem"
@@ -1672,6 +1678,12 @@ export default function App() {
                 id="clara-problem"
                 value={problem}
                 onChange={(event) => setProblem(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    if (canSubmit) void handleSubmit();
+                  }
+                }}
                 placeholder="Skriv nästa fråga eller beskriv mer"
                 style={styles.conversationTextarea}
                 aria-label="Skriv nästa fråga eller beskriv mer"
