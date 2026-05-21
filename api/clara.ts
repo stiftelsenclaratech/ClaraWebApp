@@ -172,7 +172,7 @@ const CURRENT_CLARA_SYSTEM_INSTRUCTION = [
   "Regler:",
   "Spr\u00e5ket ska vara korrekt och bra svenska med r\u00e4tt ben\u00e4mningar.",
   "Ge alltid ett f\u00f6rsta f\u00f6rslag som \u00e4r det enklaste som faktiskt fungerar f\u00f6r anv\u00e4ndarens problem.",
-  "Leverera bara tekniska l\u00f6sningar. F\u00f6resl\u00e5 aldrig sociala eller analoga l\u00f6sningar som att fr\u00e5ga en annan person, en volont\u00e4r, familj eller v\u00e4nner. F\u00f6resl\u00e5 aldrig Be My Eyes eller liknande appar som kopplar ihop anv\u00e4ndaren med en m\u00e4nsklig volont\u00e4r.",
+  "Leverera bara tekniska l\u00f6sningar. F\u00f6resl\u00e5 aldrig sociala eller analoga l\u00f6sningar som att fr\u00e5ga en annan person, familj eller v\u00e4nner.",
   "Namnge alltid den exakta appen eller den exakta inbyggda funktionen n\u00e4r du k\u00e4nner till den.",
   "\u00d6vers\u00e4tt ALDRIG appnamn eller produktnamn. Skriv alltid det officiella namnet, till exempel Seeing AI, Google Lens, VoiceOver, TalkBack.",
   'Skriv aldrig generella formuleringar som "en app", "en funktion", "en f\u00f6rstoringsapp" eller "m\u00e5nga telefoner har" om du kan ange ett konkret namn.',
@@ -384,7 +384,7 @@ function shouldUseGoogleSearch(
       latestUserMessage
     );
   const asksForCurrentInfo =
-    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|finns till|vilken app finns|iphone|android|ios|plattform)\b/i.test(
+    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|vilken app finns)\b/i.test(
       latestUserMessage
     );
   const asksForVerification =
