@@ -8,7 +8,7 @@ Set this variable in the new Vercel project:
 GOOGLE_GENERATIVE_AI_API_KEY=...
 ```
 
-Only Gemini is used. No OpenAI key is needed.
+Bara denna nyckel behövs. Ingen annan AI-tjänst används.
 
 ## 2. Local secrets
 
@@ -52,7 +52,7 @@ The frontend shows the user-friendly `reply` text from these responses directly 
 
 ## 5. Cost controls
 
-The Gemini request is now hardened with:
+API-anropet är nu härdnat med:
 
 - `maxOutputTokens: 900`
 - `thinkingBudget: 0`

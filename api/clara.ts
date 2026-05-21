@@ -616,7 +616,6 @@ async function generateWithGoogle(
 
   const { text } = await generateText({
     model: google("gemini-2.5-flash"),
-    // In AI SDK for Google, `system` is translated to Gemini `systemInstruction`.
     system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
     prompt,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
