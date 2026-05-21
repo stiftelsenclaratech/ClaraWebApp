@@ -385,7 +385,7 @@ function shouldUseGoogleSearch(
       latestUserMessage
     );
   const asksForCurrentInfo =
-    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|vilken app finns)\b/i.test(
+    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|finns till|vilken app finns|iphone|android|ios|plattform)\b/i.test(
       latestUserMessage
     );
   const asksForVerification =
@@ -426,7 +426,11 @@ function shouldUseGoogleSearchForCurrentRequest(
     return false;
   }
 
-  return true;
+  if (isFirstQuestion(messages)) {
+    return true;
+  }
+
+  return shouldUseGoogleSearch(messages, latestUserMessage);
 }
 
 function shouldUseGoogleSearchForExactLinksOrVersions(
