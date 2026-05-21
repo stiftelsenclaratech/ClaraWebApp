@@ -412,16 +412,8 @@ function formatReply(
   }
 
   function isShortStandaloneSubheading(value: string) {
-    const trimmedValue = value.trim();
-    const normalizedValue = trimmedValue.toLowerCase();
-
-    return (
-      subheadingLines.includes(normalizedValue) ||
-      (/^[A-ZÅÄÖ][A-Za-zÅÄÖåäö0-9 /()-]{1,28}$/.test(trimmedValue) &&
-        trimmedValue.split(/\s+/).length <= 4 &&
-        !trimmedValue.includes(":") &&
-        !trimmedValue.includes("."))
-    );
+    const normalizedValue = value.trim().toLowerCase();
+    return subheadingLines.includes(normalizedValue);
   }
 
   function pushListItem(item: string, ordered: boolean) {
