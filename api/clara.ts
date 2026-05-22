@@ -88,6 +88,76 @@ Undvik detaljerade steg för steg instruktioner om knapptryckningar.
 Om extern sökning inte behövs ska du hålla dig till dina instruktioner och svara utan att hitta externa källor.
 Om extern sökning används ska du bara använda den för att hitta eller verifiera specifika länkar och aktuell information.`;
 
+// Verifierade app-ID:n. Claras svar post-processas och fel app-ID:n
+// ersätts automatiskt baserat på URL-slugen i länken.
+type VerifiedApp = {
+  iosSlug: string;
+  iosId: string;
+  androidPackage?: string;
+};
+
+const VERIFIED_APPS: VerifiedApp[] = [
+  {
+    iosSlug: "seeing-ai",
+    iosId: "978347957",
+    androidPackage: "com.microsoft.seeingai",
+  },
+  {
+    iosSlug: "be-my-eyes",
+    iosId: "905003564",
+    androidPackage: "com.bemyeyes.bemyeyes",
+  },
+  {
+    iosSlug: "google-lens",
+    iosId: "1052689529",
+    androidPackage: "com.google.ar.lens",
+  },
+];
+
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function sanitizeAppLinks(text: string): string {
+  let result = text;
+
+  for (const app of VERIFIED_APPS) {
+    // Ersätt iOS App Store-URL:er med fel app-ID.
+    // Matchar på slug (t.ex. "seeing-ai") och ersätter hela URL:en.
+    const iosPattern = new RegExp(
+      `https?://apps\\.apple\\.com/[^/\\s]+/app/${escapeRegex(app.iosSlug)}/id\\d+`,
+      "gi"
+    );
+    result = result.replace(
+      iosPattern,
+      `https://apps.apple.com/fi/app/${app.iosSlug}/id${app.iosId}`
+    );
+
+    // Ersätt Android Google Play-URL:er med fel paket-ID.
+    // Matchar på exakt paket-ID (Android-IDs är mer stabila men kan ändå vara fel).
+    if (app.androidPackage) {
+      const androidPattern = new RegExp(
+        `https?://play\\.google\\.com/store/apps/details\\?id=[^\\s&"'<>]+`,
+        "gi"
+      );
+      result = result.replace(androidPattern, (match) => {
+        // Kontrollera om matchad URL verkar höra till denna app (slug-liknande keywords)
+        const slugKeywords = app.iosSlug.split("-");
+        const matchLower = match.toLowerCase();
+        const isThisApp = slugKeywords.every((keyword) =>
+          matchLower.includes(keyword)
+        );
+        if (isThisApp) {
+          return `https://play.google.com/store/apps/details?id=${app.androidPackage}`;
+        }
+        return match;
+      });
+    }
+  }
+
+  return result;
+}
+
 const LEGACY_STRICT_CLARA_SYSTEM_INSTRUCTION = [
   "Roll:",
   "Du är Clara. Du är en teknisk assistent som ENBART levererar tekniska lösningar för personer med synnedsättning.",
@@ -654,7 +724,8 @@ async function generateWithGoogle(
         }),
   });
 
-  return text || "Fick inget svar.";
+  const rawText = text || "Fick inget svar.";
+  return sanitizeAppLinks(rawText);
 }
 
 export default async function handler(req: any, res: any) {
