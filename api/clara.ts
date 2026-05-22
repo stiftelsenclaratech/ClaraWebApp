@@ -122,36 +122,53 @@ function sanitizeAppLinks(text: string): string {
   let result = text;
 
   for (const app of VERIFIED_APPS) {
+    const correctIosUrl = `https://apps.apple.com/fi/app/${app.iosSlug}/id${app.iosId}`;
+    const correctAndroidUrl = app.androidPackage
+      ? `https://play.google.com/store/apps/details?id=${app.androidPackage}`
+      : null;
+
     // Ersätt iOS App Store-URL:er med fel app-ID.
-    // Matchar på slug (t.ex. "seeing-ai") och ersätter hela URL:en.
     const iosPattern = new RegExp(
       `https?://apps\\.apple\\.com/[^/\\s]+/app/${escapeRegex(app.iosSlug)}/id\\d+`,
       "gi"
     );
-    result = result.replace(
-      iosPattern,
-      `https://apps.apple.com/fi/app/${app.iosSlug}/id${app.iosId}`
-    );
+    result = result.replace(iosPattern, correctIosUrl);
 
     // Ersätt Android Google Play-URL:er med fel paket-ID.
-    // Matchar på exakt paket-ID (Android-IDs är mer stabila men kan ändå vara fel).
-    if (app.androidPackage) {
+    if (correctAndroidUrl) {
       const androidPattern = new RegExp(
         `https?://play\\.google\\.com/store/apps/details\\?id=[^\\s&"'<>]+`,
         "gi"
       );
       result = result.replace(androidPattern, (match) => {
-        // Kontrollera om matchad URL verkar höra till denna app (slug-liknande keywords)
         const slugKeywords = app.iosSlug.split("-");
         const matchLower = match.toLowerCase();
         const isThisApp = slugKeywords.every((keyword) =>
           matchLower.includes(keyword)
         );
         if (isThisApp) {
-          return `https://play.google.com/store/apps/details?id=${app.androidPackage}`;
+          return correctAndroidUrl;
         }
         return match;
       });
+    }
+
+    // Om iOS-länken finns men Android-länken saknas — lägg till Android direkt efter.
+    if (
+      correctAndroidUrl &&
+      result.includes(correctIosUrl) &&
+      !result.includes(correctAndroidUrl)
+    ) {
+      result = result.replace(correctIosUrl, `${correctIosUrl} ${correctAndroidUrl}`);
+    }
+
+    // Om Android-länken finns men iOS-länken saknas — lägg till iOS direkt före.
+    if (
+      correctAndroidUrl &&
+      result.includes(correctAndroidUrl) &&
+      !result.includes(correctIosUrl)
+    ) {
+      result = result.replace(correctAndroidUrl, `${correctIosUrl} ${correctAndroidUrl}`);
     }
   }
 
