@@ -696,7 +696,7 @@ async function generateWithGoogle(
     system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
     prompt,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
-    maxRetries: 0,
+    maxRetries: 2,
     temperature: 0.1,
     topP: 0.1,
     topK: 1,
