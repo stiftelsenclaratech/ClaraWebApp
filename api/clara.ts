@@ -624,7 +624,7 @@ async function generateWithGoogle(
 
   const { text } = await generateText({
     model: google("gemini-2.5-flash"),
-    system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
+    system: CLARA_SYSTEM_INSTRUCTION,
     prompt,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     maxRetries: 0,
