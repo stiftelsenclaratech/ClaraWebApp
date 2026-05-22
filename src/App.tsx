@@ -1015,6 +1015,17 @@ function createStyles(
       textUnderlineOffset: 3,
       wordBreak: "break-word",
     },
+    replyWarning: {
+      marginTop: 14,
+      padding: "14px 16px",
+      borderRadius: 12,
+      background: isDark ? "rgba(255, 193, 7, 0.1)" : "rgba(255, 193, 7, 0.08)",
+      borderLeft: `4px solid ${CLARA_YELLOW}`,
+      fontSize: 16 * scale,
+      lineHeight: 1.6,
+      color: mutedText,
+      letterSpacing: "0.01em",
+    },
     conversationList: {
       display: "flex",
       flexDirection: "column",
@@ -1633,6 +1644,10 @@ export default function App() {
                 return (
                   <div key={message.id} style={styles.answerBox}>
                     <div>{formatReply(message.content, styles)}</div>
+
+                    <div style={styles.replyWarning}>
+                      ⚠️ <strong>Obs!</strong> Om en applänk inte fungerar kan du söka appen direkt i App Store eller Google Play för att säkerställa att du får rätt version.
+                    </div>
 
                     <div style={styles.messageActions}>
                       <button
