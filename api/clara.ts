@@ -480,7 +480,7 @@ function shouldUseGoogleSearch(
       latestUserMessage
     );
   const asksForCurrentInfo =
-    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|finns det|vilken app finns)\b/i.test(
+    /\b(senaste|nyaste|idag|just nu|aktuell|uppdaterad|pris|kostar|abonnemang|version|kompatibel|vilken app finns)\b/i.test(
       latestUserMessage
     );
   const asksForVerification =
@@ -719,6 +719,7 @@ async function generateWithGoogle(
     prompt,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     maxRetries: 2,
+    maxSteps: 5,
     temperature: 0.1,
     topP: 0.1,
     topK: 1,
