@@ -91,6 +91,7 @@ Om extern sökning används ska du bara använda den för att hitta eller verifi
 // Verifierade app-ID:n. Claras svar post-processas och fel app-ID:n
 // ersätts automatiskt baserat på URL-slugen i länken.
 type VerifiedApp = {
+  name: string;
   iosSlug: string;
   iosId: string;
   androidPackage?: string;
@@ -98,21 +99,25 @@ type VerifiedApp = {
 
 const VERIFIED_APPS: VerifiedApp[] = [
   {
+    name: "Seeing AI",
     iosSlug: "seeing-ai",
     iosId: "999062298",
     androidPackage: "com.microsoft.seeingai",
   },
   {
+    name: "Be My Eyes",
     iosSlug: "be-my-eyes",
     iosId: "905177575",
     androidPackage: "com.bemyeyes.bemyeyes",
   },
   {
+    name: "Google Lens",
     iosSlug: "google-lens",
     iosId: "1052689529",
     androidPackage: "com.google.ar.lens",
   },
   {
+    name: "Envision AI",
     iosSlug: "envision-ai",
     iosId: "1268632314",
     androidPackage: "com.letsenvision.envisionai",
@@ -174,6 +179,22 @@ function sanitizeAppLinks(text: string): string {
       !result.includes(correctIosUrl)
     ) {
       result = result.replace(correctAndroidUrl, `${correctIosUrl} ${correctAndroidUrl}`);
+    }
+
+    // Om appen finns för båda plattformar men texten säger bara "Finns för iPhone" — rätta till det.
+    if (correctAndroidUrl) {
+      const iPhoneOnlyPattern = new RegExp(
+        `(${escapeRegex(app.name)}[^.\\n]{0,120}?)Finns f[oö]r iPhone\\.`,
+        "gi"
+      );
+      result = result.replace(iPhoneOnlyPattern, "$1Finns för iPhone och Android.");
+
+      // Samma fix om det bara står "Finns för Android" men appen finns för båda.
+      const androidOnlyPattern = new RegExp(
+        `(${escapeRegex(app.name)}[^.\\n]{0,120}?)Finns f[oö]r Android\\.`,
+        "gi"
+      );
+      result = result.replace(androidOnlyPattern, "$1Finns för iPhone och Android.");
     }
   }
 
