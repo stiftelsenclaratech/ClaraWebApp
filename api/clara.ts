@@ -112,6 +112,11 @@ const VERIFIED_APPS: VerifiedApp[] = [
     iosId: "1052689529",
     androidPackage: "com.google.ar.lens",
   },
+  {
+    iosSlug: "envision-ai",
+    iosId: "1268632314",
+    androidPackage: "com.letsenvision.envisionai",
+  },
 ];
 
 function escapeRegex(str: string) {
