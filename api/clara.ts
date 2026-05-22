@@ -99,12 +99,12 @@ type VerifiedApp = {
 const VERIFIED_APPS: VerifiedApp[] = [
   {
     iosSlug: "seeing-ai",
-    iosId: "978347957",
+    iosId: "999062298",
     androidPackage: "com.microsoft.seeingai",
   },
   {
     iosSlug: "be-my-eyes",
-    iosId: "905003564",
+    iosId: "905177575",
     androidPackage: "com.bemyeyes.bemyeyes",
   },
   {
