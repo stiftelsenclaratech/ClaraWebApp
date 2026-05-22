@@ -212,15 +212,18 @@ const CURRENT_CLARA_SYSTEM_INSTRUCTION = [
   "Teknik",
   "Lista bara konkreta appar som redan n\u00e4mnts i svaret.",
   "S\u00f6k upp varje app och verifiera att den finns i App Store (iPhone) och Google Play (Android).",
+  "Kontrollera genom s\u00f6kningen att l\u00e4nken faktiskt \u00e4r giltig och att appen \u00e4r tillg\u00e4nglig.",
   "F\u00f6r varje app, skriv appnamnet f\u00f6ljt av de plattformsl\u00e4nkar du hittade: Namn https://apps.apple.com/... https://play.google.com/...",
   "Anv\u00e4nd globala App Store-l\u00e4nkar (apps.apple.com utan region-kod) s\u00e5 de omdirigeras automatiskt till anv\u00e4ndarens lokala App Store.",
   "Om appen bara finns f\u00f6r en plattform, skriv bara den plattformens URL.",
   "Anv\u00e4nd hela URL:er och officiella direktl\u00e4nkar till appen.",
-  "Skriv inget mer under l\u00e4nkraden.",
+  "Om du inte kan verifiera att l\u00e4nken fungerar eller att appen \u00e4r tillg\u00e4nglig i anv\u00e4ndarens region, l\u00e4gg till en varning efter l\u00e4nkraden: (L\u00e4nken kanske inte fungerar i din region - kontrollera i App Store direkt)",
+  "Skriv inget mer under l\u00e4nkraden om ingen varning beh\u00f6vs.",
   "",
   "Viktigt:",
   "Ge inga menyv\u00e4gar eller steg-f\u00f6r-steg-instruktioner om knapptryckningar om det inte uttryckligt efterfr\u00e5gas.",
-  "Om extern s\u00f6kning anv\u00e4nds ska den anv\u00e4ndas f\u00f6r att verifiera officiella l\u00e4nkar och aktuell appinformation f\u00f6r Finland.",
+  "Om extern s\u00f6kning anv\u00e4nds ska den anv\u00e4ndas f\u00f6r att verifiera officiella l\u00e4nkar, att appar \u00e4r tillg\u00e4ngliga, och aktuell appinformation.",
+  "Om s\u00f6kningen inte bekr\u00e4ftar att appen \u00e4r tillg\u00e4nglig i anv\u00e4ndarens region, m\u00e5 du rekommendera alternativ eller l\u00e4gg till en varning.",
 ].join("\n");
 
 const TRIVIAL_USER_MESSAGE_PATTERN =
