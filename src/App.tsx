@@ -307,7 +307,7 @@ function formatReply(
     "Problem",
     "Första steg",
     "Fler möjligheter",
-    "Teknik",
+    "Teknik och Appar",
     "Det här kan hjälpa dig",
     "Enkelt att börja med",
     "Bra att veta",
@@ -354,7 +354,7 @@ function formatReply(
 
   for (const line of rawLines) {
     const normalizedHeading = normalizeHeadingCandidate(line).toLowerCase();
-    const isTechniqueHeading = normalizedHeading === "teknik";
+    const isTechniqueHeading = normalizedHeading === "teknik och appar";
     const isKnownHeading = headingLines.some(
       (heading) => normalizedHeading === heading.toLowerCase()
     );

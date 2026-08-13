@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { generateText, stepCountIs } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 type ConversationRole = "user" | "assistant";
@@ -15,7 +15,7 @@ type ApiErrorCode =
   | "SERVICE_UNAVAILABLE"
   | "SERVER_ERROR";
 
-const MAX_OUTPUT_TOKENS = 900;
+const MAX_OUTPUT_TOKENS = 2048;
 const MAX_CONTEXT_MESSAGES = 8;
 const MAX_CONTEXT_CHARS = 700;
 const MAX_LATEST_MESSAGE_CHARS = 1200;
@@ -322,7 +322,7 @@ const CURRENT_CLARA_SYSTEM_INSTRUCTION = [
   "Varje alternativ ska namnge en konkret app eller exakt inbyggd funktion, f\u00f6rklara kort vad den g\u00f6r, och avslutas med Finns f\u00f6r iPhone, Finns f\u00f6r Android, eller Finns f\u00f6r iPhone och Android.",
   "Inga sociala r\u00e5d.",
   "",
-  "Teknik",
+  "Teknik och Appar",
   "Lista bara konkreta appar som redan n\u00e4mnts i svaret.",
   "F\u00f6r varje app, s\u00f6k upp den officiella l\u00e4nken genom Google Search och kopiera EXAKT app-ID:t fr\u00e5n k\u00e4llan.",
   "App Store-l\u00e4nkar m\u00e5ste ha r\u00e4tt format: https://apps.apple.com/fi/app/[app-name]/id[APP-ID]",
@@ -474,7 +474,7 @@ ${truncateText(latestUserMessage, MAX_LATEST_MESSAGE_CHARS)}
 
 Svara nu som Clara.
 ${firstQuestion
-    ? "Anv\u00e4nd den fasta strukturen f\u00f6r f\u00f6rsta svaret. Namnge konkreta appar eller exakta funktioner direkt i F\u00f6rsta steg och Fler m\u00f6jligheter. Skriv inte generella formuleringar som en app eller m\u00e5nga telefoner har. Ge inga menyv\u00e4gar eller knapptryckningar om det inte efterfr\u00e5gas. I Teknik ska du lista samma appar du n\u00e4mnt med direkta officiella l\u00e4nkar."
+    ? "Anv\u00e4nd den fasta strukturen f\u00f6r f\u00f6rsta svaret. Namnge konkreta appar eller exakta funktioner direkt i F\u00f6rsta steg och Fler m\u00f6jligheter. Skriv inte generella formuleringar som en app eller m\u00e5nga telefoner har. Ge inga menyv\u00e4gar eller knapptryckningar om det inte efterfr\u00e5gas. I Teknik och Appar ska du lista samma appar du n\u00e4mnt med direkta officiella l\u00e4nkar."
     : "Svara friare och direkt p\u00e5 f\u00f6ljdfr\u00e5gan utan att tvinga in svaret i den fasta f\u00f6rsta-svarsstrukturen. Om du k\u00e4nner till en specifik app eller funktion ska du namnge den direkt."}`;
 }
 
@@ -735,12 +735,12 @@ async function generateWithGoogle(
   });
 
   const { text } = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: google("gemini-flash-latest"),
     system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
     prompt,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     maxRetries: 2,
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
     temperature: 0.1,
     topP: 0.1,
     topK: 1,
@@ -748,7 +748,7 @@ async function generateWithGoogle(
       google: {
         responseModalities: ["TEXT"],
         thinkingConfig: {
-          thinkingBudget: 0,
+          thinkingLevel: "minimal",
         },
       },
     },
