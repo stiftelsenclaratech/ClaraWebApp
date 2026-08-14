@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.60",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/firewall": "^1.2.0",
     "@vercel/functions": "^3.5.0",
     "ai": "^6.0.154",

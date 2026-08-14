@@ -1,5 +1,15 @@
 import { generateText, stepCountIs } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { track } from "@vercel/analytics/server";
+
+// Enkel kvalitetskontroll: Clara ska aldrig svara med markdown-tecken
+// (se systeminstruktionen). Vi loggar bara en anonym räknare om det
+// ändå händer, aldrig själva svarstexten.
+const MARKDOWN_PATTERN = /[*_`#]|(^|\n)\s*[-•]\s|(^|\n)\s*\d+\.\s/;
+
+function containsMarkdown(text: string): boolean {
+  return MARKDOWN_PATTERN.test(text);
+}
 
 type ConversationRole = "user" | "assistant";
 
@@ -821,6 +831,15 @@ export default async function handler(req: any, res: any) {
 
   try {
     const reply = await generateWithGoogle(prompt, useSearch, googleApiKey);
+
+    if (containsMarkdown(reply)) {
+      try {
+        await track("markdown_detected");
+      } catch (trackError) {
+        console.error("Kunde inte logga markdown-kontroll:", trackError);
+      }
+    }
+
     return res.status(200).json({ reply });
   } catch (error) {
     console.error("Clara Google error:", error);
