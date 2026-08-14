@@ -748,45 +748,64 @@ async function generateWithGoogle(
     apiKey,
   });
 
-  const { text, finishReason, usage, steps, warnings } = await generateText({
-    model: google("gemini-flash-latest"),
-    system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
-    prompt,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    maxRetries: 2,
-    stopWhen: stepCountIs(5),
-    temperature: 0.1,
-    topP: 0.1,
-    topK: 1,
-    providerOptions: {
-      google: {
-        responseModalities: ["TEXT"],
-        // "minimal" avvisas numera av Google. Att ta bort inställningen
-        // helt lät modellen tänka fritt, vilket gjorde svaren så långsamma
-        // att funktionen hann time:a ut (30 sekunder) - särskilt med
-        // Google Search inkopplat. "low" gav enstaka tomma svar, men det
-        // är fortfarande stabilare och snabbare än att inte sätta något
-        // alls. Kombinerat med den höjda maxDuration nedan och
-        // tokenbudgeten är detta den mest stabila kombinationen vi hittat.
-        thinkingConfig: {
-          thinkingLevel: "low",
+  const runGeneration = () =>
+    generateText({
+      model: google("gemini-flash-latest"),
+      system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
+      prompt,
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxRetries: 2,
+      stopWhen: stepCountIs(5),
+      temperature: 0.1,
+      topP: 0.1,
+      topK: 1,
+      providerOptions: {
+        google: {
+          responseModalities: ["TEXT"],
+          // "minimal" avvisas numera av Google. Att ta bort inställningen
+          // helt lät modellen tänka fritt, vilket gjorde svaren så långsamma
+          // att funktionen hann time:a ut (30 sekunder) - särskilt med
+          // Google Search inkopplat. "low" gav enstaka tomma svar, men det
+          // är fortfarande stabilare och snabbare än att inte sätta något
+          // alls. Kombinerat med den höjda maxDuration nedan och
+          // tokenbudgeten är detta den mest stabila kombinationen vi hittat.
+          thinkingConfig: {
+            thinkingLevel: "low",
+          },
         },
       },
-    },
-    ...(useSearch
-      ? {
-          tools: {
-            google_search: google.tools.googleSearch({
-              searchTypes: { webSearch: {} },
-            }),
-          },
-          activeTools: ["google_search"] as const,
-          toolChoice: "auto" as const,
-        }
-      : {
-          toolChoice: "none" as const,
-        }),
-  });
+      ...(useSearch
+        ? {
+            tools: {
+              google_search: google.tools.googleSearch({
+                searchTypes: { webSearch: {} },
+              }),
+            },
+            activeTools: ["google_search"] as const,
+            toolChoice: "auto" as const,
+          }
+        : {
+            toolChoice: "none" as const,
+          }),
+    });
+
+  let { text, finishReason, usage, steps, warnings } = await runGeneration();
+
+  // Gemini kan enstaka gånger avsluta med finishReason "error" och inget
+  // svar, trots att tokenbudgeten inte är slut (känd instabilitet i
+  // kombination med "thinking" och tool use). Ett enda automatiskt
+  // omförsök löser detta i praktiken utan att användaren märker något.
+  if (!text && finishReason !== "stop") {
+    console.error("Clara tomt svar, försöker igen automatiskt:", {
+      finishReason,
+      usage,
+      warnings,
+      stepFinishReasons: steps?.map((step) => step.finishReason),
+      lastStepContentTypes: steps?.at(-1)?.content?.map((part) => part.type),
+    });
+
+    ({ text, finishReason, usage, steps, warnings } = await runGeneration());
+  }
 
   if (!text) {
     // Hjälper oss se i loggarna exakt varför, utan att spara
