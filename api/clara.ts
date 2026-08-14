@@ -761,11 +761,16 @@ async function generateWithGoogle(
     providerOptions: {
       google: {
         responseModalities: ["TEXT"],
-        // Tidigare tvingade vi fram thinkingLevel "minimal" (som Google
-        // slutade acceptera) och sedan "low" (som gav finishReason
-        // "error", särskilt tillsammans med Google Search-verktyget).
-        // Vi låter nu modellen använda sin egen standardnivå istället
-        // för att gissa fram ett nytt magiskt värde.
+        // "minimal" avvisas numera av Google. Att ta bort inställningen
+        // helt lät modellen tänka fritt, vilket gjorde svaren så långsamma
+        // att funktionen hann time:a ut (30 sekunder) - särskilt med
+        // Google Search inkopplat. "low" gav enstaka tomma svar, men det
+        // är fortfarande stabilare och snabbare än att inte sätta något
+        // alls. Kombinerat med den höjda maxDuration nedan och
+        // tokenbudgeten är detta den mest stabila kombinationen vi hittat.
+        thinkingConfig: {
+          thinkingLevel: "low",
+        },
       },
     },
     ...(useSearch
