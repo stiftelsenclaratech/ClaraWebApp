@@ -758,7 +758,11 @@ async function generateWithGoogle(
       google: {
         responseModalities: ["TEXT"],
         thinkingConfig: {
-          thinkingLevel: "minimal",
+          // Google slutade acceptera "minimal" för gemini-flash-latest
+          // ("Thinking level MINIMAL is not supported for this model"),
+          // vilket gjorde att Clara inte kunde svara alls. "low" är
+          // närmast och stöds av modellen.
+          thinkingLevel: "low",
         },
       },
     },
