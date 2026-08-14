@@ -748,7 +748,7 @@ async function generateWithGoogle(
     apiKey,
   });
 
-  const { text, finishReason, usage } = await generateText({
+  const { text, finishReason, usage, steps, warnings } = await generateText({
     model: google("gemini-flash-latest"),
     system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
     prompt,
@@ -761,13 +761,11 @@ async function generateWithGoogle(
     providerOptions: {
       google: {
         responseModalities: ["TEXT"],
-        thinkingConfig: {
-          // Google slutade acceptera "minimal" för gemini-flash-latest
-          // ("Thinking level MINIMAL is not supported for this model"),
-          // vilket gjorde att Clara inte kunde svara alls. "low" är
-          // närmast och stöds av modellen.
-          thinkingLevel: "low",
-        },
+        // Tidigare tvingade vi fram thinkingLevel "minimal" (som Google
+        // slutade acceptera) och sedan "low" (som gav finishReason
+        // "error", särskilt tillsammans med Google Search-verktyget).
+        // Vi låter nu modellen använda sin egen standardnivå istället
+        // för att gissa fram ett nytt magiskt värde.
       },
     },
     ...(useSearch
@@ -786,10 +784,15 @@ async function generateWithGoogle(
   });
 
   if (!text) {
-    // Hjälper oss se i loggarna om det beror på att tokenbudgeten tog
-    // slut (finishReason "length") eller något annat, utan att spara
+    // Hjälper oss se i loggarna exakt varför, utan att spara
     // användarens fråga eller Claras svar.
-    console.error("Clara tomt svar:", { finishReason, usage });
+    console.error("Clara tomt svar:", {
+      finishReason,
+      usage,
+      warnings,
+      stepFinishReasons: steps?.map((step) => step.finishReason),
+      lastStepContentTypes: steps?.at(-1)?.content?.map((part) => part.type),
+    });
   }
 
   const rawText = text || "Fick inget svar.";
