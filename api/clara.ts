@@ -25,7 +25,11 @@ type ApiErrorCode =
   | "SERVICE_UNAVAILABLE"
   | "SERVER_ERROR";
 
-const MAX_OUTPUT_TOKENS = 2048;
+// thinkingLevel "low" (se nedan) förbrukar resonemang-tokens ur samma
+// budget som svarstexten. 2048 var för snålt tilltaget och gav ofta ett
+// tomt svar ("Fick inget svar.") eftersom resonemanget åt upp hela
+// budgeten innan själva svaret hann skrivas. Höjt som marginal.
+const MAX_OUTPUT_TOKENS = 4096;
 const MAX_CONTEXT_MESSAGES = 8;
 const MAX_CONTEXT_CHARS = 700;
 const MAX_LATEST_MESSAGE_CHARS = 1200;
@@ -744,7 +748,7 @@ async function generateWithGoogle(
     apiKey,
   });
 
-  const { text } = await generateText({
+  const { text, finishReason, usage } = await generateText({
     model: google("gemini-flash-latest"),
     system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
     prompt,
@@ -780,6 +784,13 @@ async function generateWithGoogle(
           toolChoice: "none" as const,
         }),
   });
+
+  if (!text) {
+    // Hjälper oss se i loggarna om det beror på att tokenbudgeten tog
+    // slut (finishReason "length") eller något annat, utan att spara
+    // användarens fråga eller Claras svar.
+    console.error("Clara tomt svar:", { finishReason, usage });
+  }
 
   const rawText = text || "Fick inget svar.";
   return sanitizeAppLinks(rawText);
