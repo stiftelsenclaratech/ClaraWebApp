@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { track } from "@vercel/analytics";
 import claraLogoDark from "./assets/clara-logo-dark.png";
 import claraLogoLight from "./assets/clara-logo-light.png";
 
@@ -1088,6 +1089,36 @@ function createStyles(
       lineHeight: 1.5,
       color: softText,
     },
+    satisfactionRow: {
+      marginTop: 14,
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 10,
+    },
+    satisfactionLabel: {
+      margin: 0,
+      fontSize: 15 * scale,
+      lineHeight: 1.5,
+      color: softText,
+    },
+    satisfactionButton: {
+      padding: "10px 16px",
+      borderRadius: 14,
+      border: borderColor,
+      background: actionSurface,
+      color: mainText,
+      fontSize: 15 * scale,
+      fontWeight: 700,
+      cursor: "pointer",
+      letterSpacing: "0.01em",
+    },
+    satisfactionButtonActive: {
+      background: accentColor,
+      color: CLARA_WHITE,
+      border: "none",
+    },
     srOnly: {
       position: "absolute",
       width: 1,
@@ -1118,6 +1149,9 @@ export default function App() {
     messageId: null,
     text: "",
   });
+  const [satisfactionVotes, setSatisfactionVotes] = useState<
+    Record<string, "yes" | "no">
+  >({});
   const menuRef = useRef<HTMLDivElement | null>(null);
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -1269,6 +1303,15 @@ export default function App() {
     setActionFeedback({ messageId: null, text: "" });
     setMenuOpen(false);
 
+    // Anonym mätning: räknar bara om det här är samtalets första fråga
+    // eller en följdfråga. Inget meddelandeinnehåll och ingen identifierare
+    // skickas med.
+    try {
+      track(messages.length === 0 ? "conversation_started" : "follow_up_asked");
+    } catch {
+      // mätning får aldrig störa samtalet
+    }
+
     const userMessage = createMessage("user", trimmedInput);
     const nextMessages = [...messages, userMessage];
     const apiMessages = nextMessages.map(({ role, content }) => ({ role, content }));
@@ -1348,6 +1391,22 @@ export default function App() {
     synth.cancel();
     synth.speak(utterance);
     setSpeakingMessageId(message.id);
+  }
+
+  function handleSatisfactionVote(messageId: string, value: "yes" | "no") {
+    if (satisfactionVotes[messageId]) {
+      return;
+    }
+
+    setSatisfactionVotes((prev) => ({ ...prev, [messageId]: value }));
+
+    // Anonym mätning: bara "ja" eller "nej" skickas, aldrig svarstexten
+    // eller något som kan kopplas till en person.
+    try {
+      track("feedback", { value });
+    } catch {
+      // mätning får aldrig störa samtalet
+    }
   }
 
   function increaseTextSize() {
@@ -1652,6 +1711,46 @@ export default function App() {
                       >
                         {isSpeaking ? "Stoppa uppläsning" : "Läs upp svaret"}
                       </button>
+                    </div>
+
+                    <div style={styles.satisfactionRow}>
+                      <p style={styles.satisfactionLabel}>Hjälpte detta?</p>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSatisfactionVote(message.id, "yes")}
+                        disabled={!!satisfactionVotes[message.id]}
+                        style={{
+                          ...styles.satisfactionButton,
+                          ...(satisfactionVotes[message.id] === "yes"
+                            ? styles.satisfactionButtonActive
+                            : {}),
+                        }}
+                        aria-pressed={satisfactionVotes[message.id] === "yes"}
+                        aria-label="Ja, det här svaret hjälpte"
+                      >
+                        Ja
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSatisfactionVote(message.id, "no")}
+                        disabled={!!satisfactionVotes[message.id]}
+                        style={{
+                          ...styles.satisfactionButton,
+                          ...(satisfactionVotes[message.id] === "no"
+                            ? styles.satisfactionButtonActive
+                            : {}),
+                        }}
+                        aria-pressed={satisfactionVotes[message.id] === "no"}
+                        aria-label="Nej, det här svaret hjälpte inte"
+                      >
+                        Nej
+                      </button>
+
+                      {satisfactionVotes[message.id] && (
+                        <p style={styles.messageFeedback}>Tack för din feedback!</p>
+                      )}
                     </div>
                   </div>
                 );

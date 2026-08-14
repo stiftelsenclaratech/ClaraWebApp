@@ -1,5 +1,15 @@
 import { generateText, stepCountIs } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { track } from "@vercel/analytics/server";
+
+// Enkel kvalitetskontroll: Clara ska aldrig svara med markdown-tecken
+// (se systeminstruktionen). Vi loggar bara en anonym räknare om det
+// ändå händer, aldrig själva svarstexten.
+const MARKDOWN_PATTERN = /[*_`#]|(^|\n)\s*[-•]\s|(^|\n)\s*\d+\.\s/;
+
+function containsMarkdown(text: string): boolean {
+  return MARKDOWN_PATTERN.test(text);
+}
 
 type ConversationRole = "user" | "assistant";
 
@@ -15,7 +25,11 @@ type ApiErrorCode =
   | "SERVICE_UNAVAILABLE"
   | "SERVER_ERROR";
 
-const MAX_OUTPUT_TOKENS = 2048;
+// thinkingLevel "low" (se nedan) förbrukar resonemang-tokens ur samma
+// budget som svarstexten. 2048 var för snålt tilltaget och gav ofta ett
+// tomt svar ("Fick inget svar.") eftersom resonemanget åt upp hela
+// budgeten innan själva svaret hann skrivas. Höjt som marginal.
+const MAX_OUTPUT_TOKENS = 4096;
 const MAX_CONTEXT_MESSAGES = 8;
 const MAX_CONTEXT_CHARS = 700;
 const MAX_LATEST_MESSAGE_CHARS = 1200;
@@ -734,38 +748,76 @@ async function generateWithGoogle(
     apiKey,
   });
 
-  const { text } = await generateText({
-    model: google("gemini-flash-latest"),
-    system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
-    prompt,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    maxRetries: 2,
-    stopWhen: stepCountIs(5),
-    temperature: 0.1,
-    topP: 0.1,
-    topK: 1,
-    providerOptions: {
-      google: {
-        responseModalities: ["TEXT"],
-        thinkingConfig: {
-          thinkingLevel: "minimal",
+  const runGeneration = () =>
+    generateText({
+      model: google("gemini-flash-latest"),
+      system: CURRENT_CLARA_SYSTEM_INSTRUCTION,
+      prompt,
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxRetries: 2,
+      stopWhen: stepCountIs(5),
+      temperature: 0.1,
+      topP: 0.1,
+      topK: 1,
+      providerOptions: {
+        google: {
+          responseModalities: ["TEXT"],
+          // "minimal" avvisas numera av Google. Att ta bort inställningen
+          // helt lät modellen tänka fritt, vilket gjorde svaren så långsamma
+          // att funktionen hann time:a ut (30 sekunder) - särskilt med
+          // Google Search inkopplat. "low" gav enstaka tomma svar, men det
+          // är fortfarande stabilare och snabbare än att inte sätta något
+          // alls. Kombinerat med den höjda maxDuration nedan och
+          // tokenbudgeten är detta den mest stabila kombinationen vi hittat.
+          thinkingConfig: {
+            thinkingLevel: "low",
+          },
         },
       },
-    },
-    ...(useSearch
-      ? {
-          tools: {
-            google_search: google.tools.googleSearch({
-              searchTypes: { webSearch: {} },
-            }),
-          },
-          activeTools: ["google_search"] as const,
-          toolChoice: "auto" as const,
-        }
-      : {
-          toolChoice: "none" as const,
-        }),
-  });
+      ...(useSearch
+        ? {
+            tools: {
+              google_search: google.tools.googleSearch({
+                searchTypes: { webSearch: {} },
+              }),
+            },
+            activeTools: ["google_search"] as const,
+            toolChoice: "auto" as const,
+          }
+        : {
+            toolChoice: "none" as const,
+          }),
+    });
+
+  let { text, finishReason, usage, steps, warnings } = await runGeneration();
+
+  // Gemini kan enstaka gånger avsluta med finishReason "error" och inget
+  // svar, trots att tokenbudgeten inte är slut (känd instabilitet i
+  // kombination med "thinking" och tool use). Ett enda automatiskt
+  // omförsök löser detta i praktiken utan att användaren märker något.
+  if (!text && finishReason !== "stop") {
+    console.error("Clara tomt svar, försöker igen automatiskt:", {
+      finishReason,
+      usage,
+      warnings,
+      stepFinishReasons: steps?.map((step) => step.finishReason),
+      lastStepContentTypes: steps?.at(-1)?.content?.map((part) => part.type),
+    });
+
+    ({ text, finishReason, usage, steps, warnings } = await runGeneration());
+  }
+
+  if (!text) {
+    // Hjälper oss se i loggarna exakt varför, utan att spara
+    // användarens fråga eller Claras svar.
+    console.error("Clara tomt svar:", {
+      finishReason,
+      usage,
+      warnings,
+      stepFinishReasons: steps?.map((step) => step.finishReason),
+      lastStepContentTypes: steps?.at(-1)?.content?.map((part) => part.type),
+    });
+  }
 
   const rawText = text || "Fick inget svar.";
   return sanitizeAppLinks(rawText);
@@ -821,6 +873,15 @@ export default async function handler(req: any, res: any) {
 
   try {
     const reply = await generateWithGoogle(prompt, useSearch, googleApiKey);
+
+    if (containsMarkdown(reply)) {
+      try {
+        await track("markdown_detected");
+      } catch (trackError) {
+        console.error("Kunde inte logga markdown-kontroll:", trackError);
+      }
+    }
+
     return res.status(200).json({ reply });
   } catch (error) {
     console.error("Clara Google error:", error);
