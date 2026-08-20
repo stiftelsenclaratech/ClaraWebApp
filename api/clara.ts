@@ -789,7 +789,29 @@ async function generateWithGoogle(
           }),
     });
 
-  let { text, finishReason, usage, steps, warnings } = await runGeneration();
+  let generationResult;
+  try {
+    generationResult = await runGeneration();
+  } catch (error) {
+    // "maxRetries: 2" ovan låter Vercel AI SDK göra tre försök internt mot
+    // Google, men om Google är hårt belastad (503 "high demand") under
+    // längre tid räcker inte det - felet kastas ändå (sågs i produktion
+    // 2026-08-14 och igen 2026-08-20, trots att detta annars fungerar).
+    // Är felet av det tillfälliga slaget gör vi ett helt nytt omförsök
+    // (tre nya interna försök) innan vi ger upp. Är felet inte tillfälligt
+    // (t.ex. fel API-nyckel) kastar vi vidare direkt.
+    if (!isTemporaryProviderError(error)) {
+      throw error;
+    }
+
+    console.error(
+      "Clara: tillfälligt fel mot Google, försöker igen automatiskt:",
+      error
+    );
+    generationResult = await runGeneration();
+  }
+
+  let { text, finishReason, usage, steps, warnings } = generationResult;
 
   // Gemini kan enstaka gånger avsluta med finishReason "error" och inget
   // svar, trots att tokenbudgeten inte är slut (känd instabilitet i
