@@ -19,7 +19,18 @@ const CLARA_BLACK = "#000000";
 const CLARA_WHITE = "#FFFFFF";
 
 type ThemeMode = "light" | "dark";
-type TextSizeMode = "aa" | "aaa";
+
+// Textstorlek: AA/AAA är inte längre ett fast tvåläge utan +/- knappar.
+// AA minskar (men aldrig under ingångsvärdet 1), AAA ökar (utan att bli
+// för stort för layouten).
+const TEXT_SCALE_DEFAULT = 1;
+const TEXT_SCALE_MIN = TEXT_SCALE_DEFAULT;
+const TEXT_SCALE_MAX = 2;
+const TEXT_SCALE_STEP = 0.15;
+
+function clampTextScale(value: number) {
+  return Math.min(TEXT_SCALE_MAX, Math.max(TEXT_SCALE_MIN, value));
+}
 type ConversationRole = "user" | "assistant";
 
 type ApiConversationMessage = {
@@ -599,16 +610,19 @@ function getThemeShortLabel(mode: ThemeMode) {
   return "Ljus";
 }
 
+function getTextScaleDescription(scale: number) {
+  return `Aktuell textstorlek ${Math.round(scale * 100)} procent.`;
+}
+
 function getThemeLogo(mode: ThemeMode) {
   return mode === "dark" ? claraLogoDark : claraLogoLight;
 }
 
 function createStyles(
   activeTheme: ThemeMode,
-  textSize: TextSizeMode
+  textScale: number
 ): Record<string, CSSProperties> {
-  // Samma multiplikator som stiftelsenclara.fi använder för AA/AAA.
-  const scale = textSize === "aaa" ? 1.25 : 1;
+  const scale = clampTextScale(textScale);
   const isDark = activeTheme === "dark";
 
   // Matchar det riktiga mörka läget på stiftelsenclara.fi (inte den
@@ -723,6 +737,12 @@ function createStyles(
     segToggleButtonActive: {
       background: CLARA_YELLOW,
       color: CLARA_BLACK,
+    },
+    // Visar att gränsen är nådd (AA kan inte bli mindre än
+    // ingångsvärdet, AAA har ett tak) utan att knappen försvinner.
+    segToggleButtonDisabled: {
+      opacity: 0.4,
+      cursor: "not-allowed",
     },
     intro: {
       maxWidth: 32 * 16,
@@ -1000,7 +1020,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
-  const [textSize, setTextSize] = useState<TextSizeMode>("aa");
+  const [textScale, setTextScale] = useState(TEXT_SCALE_DEFAULT);
   const [announcement, setAnnouncement] = useState<AnnouncementState>({
     key: 0,
     text: "",
@@ -1027,8 +1047,11 @@ export default function App() {
         setThemeMode(savedTheme);
       }
 
-      if (savedTextSize === "aa" || savedTextSize === "aaa") {
-        setTextSize(savedTextSize);
+      if (savedTextSize !== null) {
+        const parsed = Number(savedTextSize);
+        if (!Number.isNaN(parsed)) {
+          setTextScale(clampTextScale(parsed));
+        }
       }
     } catch {
       // ignore localStorage errors
@@ -1061,11 +1084,11 @@ export default function App() {
     }
 
     try {
-      window.localStorage.setItem("clara-text-size", textSize);
+      window.localStorage.setItem("clara-text-size", String(textScale));
     } catch {
       // ignore localStorage errors
     }
-  }, [textSize]);
+  }, [textScale]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -1097,8 +1120,8 @@ export default function App() {
   }, [messages, loading]);
 
   const styles = useMemo(
-    () => createStyles(themeMode, textSize),
-    [themeMode, textSize]
+    () => createStyles(themeMode, textScale),
+    [themeMode, textScale]
   );
   const currentLogo = getThemeLogo(themeMode);
 
@@ -1365,24 +1388,49 @@ export default function App() {
                 role="group"
                 aria-labelledby="ts-toggle-label"
               >
-                {(["aa", "aaa"] as TextSizeMode[]).map((size) => {
-                  const active = textSize === size;
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setTextSize(size)}
-                      style={{
-                        ...styles.segToggleButton,
-                        ...(active ? styles.segToggleButtonActive : {}),
-                      }}
-                      aria-pressed={active}
-                      title={size === "aaa" ? "Större textstorlek" : "Normal textstorlek"}
-                    >
-                      {size.toUpperCase()}
-                    </button>
-                  );
-                })}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTextScale((prev) =>
+                      clampTextScale(prev - TEXT_SCALE_STEP)
+                    )
+                  }
+                  disabled={textScale <= TEXT_SCALE_MIN}
+                  style={{
+                    ...styles.segToggleButton,
+                    ...(textScale <= TEXT_SCALE_MIN
+                      ? styles.segToggleButtonDisabled
+                      : {}),
+                  }}
+                  aria-label={`Minska textstorlek. ${getTextScaleDescription(
+                    textScale
+                  )}`}
+                  title="Minska textstorlek"
+                >
+                  AA
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTextScale((prev) =>
+                      clampTextScale(prev + TEXT_SCALE_STEP)
+                    )
+                  }
+                  disabled={textScale >= TEXT_SCALE_MAX}
+                  style={{
+                    ...styles.segToggleButton,
+                    ...(textScale >= TEXT_SCALE_MAX
+                      ? styles.segToggleButtonDisabled
+                      : {}),
+                  }}
+                  aria-label={`Öka textstorlek. ${getTextScaleDescription(
+                    textScale
+                  )}`}
+                  title="Öka textstorlek"
+                >
+                  AAA
+                </button>
               </div>
             </div>
           </div>
