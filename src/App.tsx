@@ -1235,6 +1235,33 @@ export default function App() {
     }
   }
 
+  // Knappen får aldrig bli disabled (native disabled tar bort fokus och
+  // VoiceOver hoppar då till sidans början). Istället stannar den
+  // klickbar vid gränsen och meddelar det via live-regionen.
+  function handleDecreaseTextScale() {
+    const next = clampTextScale(textScale - TEXT_SCALE_STEP);
+    setTextScale(next);
+
+    if (next <= TEXT_SCALE_MIN) {
+      setAnnouncement((prev) => ({
+        key: prev.key + 1,
+        text: "Minsta textstorleken. Kan inte bli mindre.",
+      }));
+    }
+  }
+
+  function handleIncreaseTextScale() {
+    const next = clampTextScale(textScale + TEXT_SCALE_STEP);
+    setTextScale(next);
+
+    if (next >= TEXT_SCALE_MAX) {
+      setAnnouncement((prev) => ({
+        key: prev.key + 1,
+        text: "Största textstorleken. Kan inte bli större.",
+      }));
+    }
+  }
+
   function buildConversationExportText() {
     if (!messages.length) {
       return "Samtalet är tomt.";
@@ -1369,12 +1396,8 @@ export default function App() {
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    setTextScale((prev) =>
-                      clampTextScale(prev - TEXT_SCALE_STEP)
-                    )
-                  }
-                  disabled={textScale <= TEXT_SCALE_MIN}
+                  onClick={handleDecreaseTextScale}
+                  aria-disabled={textScale <= TEXT_SCALE_MIN}
                   style={{
                     ...styles.segToggleButton,
                     ...(textScale <= TEXT_SCALE_MIN
@@ -1391,12 +1414,8 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setTextScale((prev) =>
-                      clampTextScale(prev + TEXT_SCALE_STEP)
-                    )
-                  }
-                  disabled={textScale >= TEXT_SCALE_MAX}
+                  onClick={handleIncreaseTextScale}
+                  aria-disabled={textScale >= TEXT_SCALE_MAX}
                   style={{
                     ...styles.segToggleButton,
                     ...(textScale >= TEXT_SCALE_MAX
