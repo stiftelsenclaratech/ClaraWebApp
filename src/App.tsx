@@ -19,6 +19,7 @@ const CLARA_BLACK = "#000000";
 const CLARA_WHITE = "#FFFFFF";
 
 type ThemeMode = "light" | "dark";
+type TextSizeMode = "aa" | "aaa";
 type ConversationRole = "user" | "assistant";
 
 type ApiConversationMessage = {
@@ -173,14 +174,6 @@ function getBestSwedishVoice(): SpeechSynthesisVoice | null {
     voices.find((voice) => voice.lang.toLowerCase().startsWith("sv")) ||
     null
   );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getFontScale(step: number) {
-  return 1 + step * 0.12;
 }
 
 function formatReply(
@@ -596,31 +589,6 @@ function formatReply(
   });
 }
 
-function MenuIcon({
-  size = 22,
-  color = CLARA_VIOLET,
-}: {
-  size?: number;
-  color?: string;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M4 7H20M4 12H20M4 17H20"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function getThemeLabel(mode: ThemeMode) {
   if (mode === "dark") return "Mörkt läge";
   return "Ljust läge";
@@ -637,19 +605,19 @@ function getThemeLogo(mode: ThemeMode) {
 
 function createStyles(
   activeTheme: ThemeMode,
-  textSizeStep: number
+  textSize: TextSizeMode
 ): Record<string, CSSProperties> {
-  const scale = getFontScale(textSizeStep);
+  // Samma multiplikator som stiftelsenclara.fi använder för AA/AAA.
+  const scale = textSize === "aaa" ? 1.25 : 1;
   const isDark = activeTheme === "dark";
 
-  // Följer Stiftelsen Claras designsystem: Mörkt läge är en viol sida med
-  // vit text och solrosgula accenter, aldrig svart. Skuggor undviks helt
-  // (identiteten bygger på konturer, inte skugga) utom på det flytande
-  // inställningspanelen.
-  const pageBackground = isDark ? CLARA_VIOLET : CLARA_WHITE;
-  const panelBackground = isDark ? CLARA_VIOLET : "#F7F5FA";
-  const fieldBackground = isDark ? CLARA_VIOLET : CLARA_WHITE;
-  const menuBackground = isDark ? CLARA_VIOLET : CLARA_WHITE;
+  // Matchar det riktiga mörka läget på stiftelsenclara.fi (inte den
+  // arkiverade grafiska manualen, som beskriver ett viol mörkt läge som
+  // aldrig användes på riktiga sajten): svart sida, vit text, solrosgula
+  // accenter oförändrade. Skuggor undviks helt (konturer, inte skugga).
+  const pageBackground = isDark ? CLARA_BLACK : CLARA_WHITE;
+  const panelBackground = isDark ? CLARA_BLACK : "#F7F5FA";
+  const fieldBackground = isDark ? CLARA_BLACK : CLARA_WHITE;
   const borderColor = isDark
     ? `2px solid ${CLARA_WHITE}`
     : `2px solid ${CLARA_VIOLET}`;
@@ -663,14 +631,11 @@ function createStyles(
   const accentColor = isDark ? CLARA_YELLOW : CLARA_VIOLET;
   const actionSurface = "transparent";
   const chipSurface = "transparent";
-  const userBubbleBackground = isDark
-    ? "color-mix(in srgb, #34225C 70%, #000000)"
-    : CLARA_LIGHT_VIOLET;
+  const userBubbleBackground = isDark ? CLARA_VIOLET : CLARA_LIGHT_VIOLET;
   const userBubbleText = isDark ? CLARA_WHITE : CLARA_BLACK;
   const buttonShadow = "none";
-  const overlayShadow = "0 12px 32px rgba(52, 34, 92, 0.18)";
   // Primärknappen byter till solrosgul/svart i mörkt läge, annars
-  // försvinner den mot den viola sidan.
+  // försvinner den mot den svarta sidan.
   const primaryBg = isDark ? CLARA_YELLOW : CLARA_VIOLET;
   const primaryFg = isDark ? CLARA_BLACK : CLARA_WHITE;
 
@@ -693,78 +658,46 @@ function createStyles(
       textAlign: "center",
       position: "relative",
     },
+    // Header: logo + alltid synlig läsarkontroll (Bakgrund, Textstorlek),
+    // precis som headern på stiftelsenclara.fi - ingen dold inställningsmeny.
     topBar: {
-      display: "grid",
-      gridTemplateColumns: "56px minmax(0, 1fr) 56px",
-      alignItems: "start",
-      marginBottom: 28,
-      columnGap: 12,
-    },
-    topSpacer: {
-      width: 56,
-      height: 56,
-    },
-    centerLogo: {
-      justifySelf: "center",
       display: "flex",
-      justifyContent: "center",
+      flexWrap: "wrap",
       alignItems: "center",
-      paddingTop: 4,
-    },
-    logo: {
-      width: "100%",
-      maxWidth: 252,
-      display: "block",
-    },
-    menuWrap: {
-      justifySelf: "end",
-      position: "relative",
-    },
-    menuButton: {
-      width: 56,
-      height: 56,
-      borderRadius: 999,
-      border: borderColor,
-      background: actionSurface,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 0,
-    },
-    menuPanel: {
-      position: "absolute",
-      top: 64,
-      right: 0,
-      width: 272,
-      background: menuBackground,
-      border: borderColor,
-      borderRadius: 20,
-      boxShadow: overlayShadow,
-      padding: 18,
-      zIndex: 20,
+      justifyContent: "space-between",
+      rowGap: 16,
+      columnGap: 24,
+      marginBottom: 0,
       textAlign: "left",
     },
-    panelGroup: {
+    logo: {
+      height: 48,
+      width: "auto",
+      display: "block",
+    },
+    a11yBar: {
       display: "flex",
-      flexDirection: "column",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 20,
+    },
+    a11yGroup: {
+      display: "flex",
+      alignItems: "center",
       gap: 10,
     },
-    panelLabel: {
-      fontSize: 15 * scale,
+    a11yLabel: {
+      fontSize: 13 * scale,
       fontWeight: 700,
       color: headingColor,
       letterSpacing: "0.02em",
     },
-    panelDivider: {
-      height: 1,
-      background: isDark
-        ? "rgba(255, 255, 255, 0.14)"
-        : "rgba(52, 34, 92, 0.12)",
-      margin: "4px 0",
+    headerRule: {
       border: "none",
+      borderBottom: `3px solid ${isDark ? CLARA_WHITE : CLARA_VIOLET}`,
+      margin: "20px 0 28px",
     },
-    // Segmenterad pill-brytpunkt (Ljus/Mörk), samma mönster som
+    // Segmenterad pill-brytpunkt (Ljus/Mörk, AA/AAA), samma mönster som
     // stiftelsenclara.fi använder för sina läsarkontroller.
     segToggle: {
       display: "inline-flex",
@@ -772,12 +705,10 @@ function createStyles(
       gap: 3,
       border: borderColor,
       borderRadius: 999,
-      width: "100%",
       boxSizing: "border-box",
     },
     segToggleButton: {
-      flex: 1,
-      padding: "10px 12px",
+      padding: "8px 16px",
       minHeight: 40,
       border: "none",
       cursor: "pointer",
@@ -786,39 +717,12 @@ function createStyles(
       color: mainText,
       fontFamily: "inherit",
       fontWeight: 700,
-      fontSize: 15 * scale,
+      fontSize: 14 * scale,
       letterSpacing: "0.01em",
     },
     segToggleButtonActive: {
       background: CLARA_YELLOW,
       color: CLARA_BLACK,
-    },
-    textRow: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-    },
-    sizeButton: {
-      width: 56,
-      height: 56,
-      borderRadius: 999,
-      border: borderColor,
-      background: actionSurface,
-      color: mainText,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-      fontWeight: 700,
-      lineHeight: 1,
-      padding: 0,
-    },
-    smallT: {
-      fontSize: `${clamp(14 + textSizeStep * 2, 12, 26)}px`,
-    },
-    largeT: {
-      fontSize: `${clamp(24 + textSizeStep * 3, 18, 44)}px`,
     },
     intro: {
       maxWidth: 32 * 16,
@@ -1096,8 +1000,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
-  const [textSizeStep, setTextSizeStep] = useState(2);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [textSize, setTextSize] = useState<TextSizeMode>("aa");
   const [announcement, setAnnouncement] = useState<AnnouncementState>({
     key: 0,
     text: "",
@@ -1109,7 +1012,6 @@ export default function App() {
   const [satisfactionVotes, setSatisfactionVotes] = useState<
     Record<string, "yes" | "no">
   >({});
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1125,11 +1027,8 @@ export default function App() {
         setThemeMode(savedTheme);
       }
 
-      if (savedTextSize !== null) {
-        const parsed = Number(savedTextSize);
-        if (!Number.isNaN(parsed)) {
-          setTextSizeStep(clamp(parsed, -4, 10));
-        }
+      if (savedTextSize === "aa" || savedTextSize === "aaa") {
+        setTextSize(savedTextSize);
       }
     } catch {
       // ignore localStorage errors
@@ -1162,11 +1061,11 @@ export default function App() {
     }
 
     try {
-      window.localStorage.setItem("clara-text-size", String(textSizeStep));
+      window.localStorage.setItem("clara-text-size", textSize);
     } catch {
       // ignore localStorage errors
     }
-  }, [textSizeStep]);
+  }, [textSize]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -1187,36 +1086,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-
-    function handleClickOutside(event: MouseEvent) {
-      if (!menuRef.current) {
-        return;
-      }
-
-      if (!menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [menuOpen]);
-
-  useEffect(() => {
     if (!messages.length && !loading) {
       return;
     }
@@ -1228,10 +1097,9 @@ export default function App() {
   }, [messages, loading]);
 
   const styles = useMemo(
-    () => createStyles(themeMode, textSizeStep),
-    [themeMode, textSizeStep]
+    () => createStyles(themeMode, textSize),
+    [themeMode, textSize]
   );
-  const themeIconColor = themeMode === "dark" ? CLARA_WHITE : CLARA_VIOLET;
   const currentLogo = getThemeLogo(themeMode);
 
   const hasConversation = messages.length > 0;
@@ -1258,7 +1126,6 @@ export default function App() {
 
     stopSpeaking();
     setActionFeedback({ messageId: null, text: "" });
-    setMenuOpen(false);
 
     // Anonym mätning: räknar bara om det här är samtalets första fråga
     // eller en följdfråga. Inget meddelandeinnehåll och ingen identifierare
@@ -1366,18 +1233,6 @@ export default function App() {
     }
   }
 
-  function increaseTextSize() {
-    setTextSizeStep((prev) => clamp(prev + 1, -4, 10));
-  }
-
-  function decreaseTextSize() {
-    setTextSizeStep((prev) => clamp(prev - 1, -4, 10));
-  }
-
-  function getTextSizeDescription() {
-    return `Textstorlek nivå ${textSizeStep + 5} av 15.`;
-  }
-
   function buildConversationExportText() {
     if (!messages.length) {
       return "Samtalet är tomt.";
@@ -1468,86 +1323,72 @@ export default function App() {
       <h1 style={styles.srOnly}>Clara</h1>
       <div style={styles.container}>
         <div style={styles.topBar}>
-          <div style={styles.topSpacer} />
+          <img src={currentLogo} alt="Clara" style={styles.logo} />
 
-          <div style={styles.centerLogo}>
-            <img src={currentLogo} alt="Clara" style={styles.logo} />
-          </div>
-
-          <div style={styles.menuWrap} ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              style={styles.menuButton}
-              aria-label={
-                menuOpen ? "Stäng inställningsmenyn" : "Öppna inställningsmenyn"
-              }
-              aria-expanded={menuOpen}
-              title="Inställningar"
-            >
-              <MenuIcon size={26} color={themeIconColor} />
-            </button>
-
-            {menuOpen && (
-              <div style={styles.menuPanel} role="group" aria-label="Inställningar">
-                <div style={styles.panelGroup}>
-                  <div style={styles.panelLabel}>Textstorlek</div>
-
-                  <div style={styles.textRow}>
+          <div style={styles.a11yBar}>
+            <div style={styles.a11yGroup}>
+              <span style={styles.a11yLabel} id="bg-toggle-label">
+                Bakgrund
+              </span>
+              <div
+                style={styles.segToggle}
+                role="group"
+                aria-labelledby="bg-toggle-label"
+              >
+                {(["light", "dark"] as ThemeMode[]).map((mode) => {
+                  const active = themeMode === mode;
+                  return (
                     <button
+                      key={mode}
                       type="button"
-                      onClick={decreaseTextSize}
-                      style={styles.sizeButton}
-                      aria-label={`Minska textstorleken. ${getTextSizeDescription()}`}
-                      title="Minska textstorleken"
+                      onClick={() => setThemeMode(mode)}
+                      style={{
+                        ...styles.segToggleButton,
+                        ...(active ? styles.segToggleButtonActive : {}),
+                      }}
+                      aria-pressed={active}
+                      title={getThemeLabel(mode)}
                     >
-                      <span style={styles.smallT}>T</span>
+                      {getThemeShortLabel(mode)}
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={increaseTextSize}
-                      style={styles.sizeButton}
-                      aria-label={`Öka textstorleken. ${getTextSizeDescription()}`}
-                      title="Öka textstorleken"
-                    >
-                      <span style={styles.largeT}>T</span>
-                    </button>
-                  </div>
-
-                  <hr style={styles.panelDivider} />
-
-                  <div style={styles.panelLabel} id="theme-toggle-label">Bakgrund</div>
-
-                  <div
-                    style={styles.segToggle}
-                    role="group"
-                    aria-labelledby="theme-toggle-label"
-                  >
-                    {(["light", "dark"] as ThemeMode[]).map((mode) => {
-                      const active = themeMode === mode;
-                      return (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => setThemeMode(mode)}
-                          style={{
-                            ...styles.segToggleButton,
-                            ...(active ? styles.segToggleButtonActive : {}),
-                          }}
-                          aria-pressed={active}
-                          title={getThemeLabel(mode)}
-                        >
-                          {getThemeShortLabel(mode)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+
+            <div style={styles.a11yGroup}>
+              <span style={styles.a11yLabel} id="ts-toggle-label">
+                Textstorlek
+              </span>
+              <div
+                style={styles.segToggle}
+                role="group"
+                aria-labelledby="ts-toggle-label"
+              >
+                {(["aa", "aaa"] as TextSizeMode[]).map((size) => {
+                  const active = textSize === size;
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setTextSize(size)}
+                      style={{
+                        ...styles.segToggleButton,
+                        ...(active ? styles.segToggleButtonActive : {}),
+                      }}
+                      aria-pressed={active}
+                      title={size === "aaa" ? "Större textstorlek" : "Normal textstorlek"}
+                    >
+                      {size.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
+
+        <hr style={styles.headerRule} />
 
         <p style={styles.intro}>
           Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik som kan hjälpa.
