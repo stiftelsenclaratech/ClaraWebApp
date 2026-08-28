@@ -11,6 +11,15 @@ function containsMarkdown(text: string): boolean {
   return MARKDOWN_PATTERN.test(text);
 }
 
+// Grov avstämning mot avgränsningens föreslagna avböjningsfras (se
+// systeminstruktionen). Bara en anonym räknare för att se hur ofta Clara
+// avböjer, aldrig själva frågan eller svarstexten.
+const OFF_TOPIC_DECLINE_PATTERN = /ställ gärna en fråga om det/i;
+
+function isOffTopicDecline(text: string): boolean {
+  return OFF_TOPIC_DECLINE_PATTERN.test(text);
+}
+
 type ConversationRole = "user" | "assistant";
 
 type ConversationMessage = {
@@ -907,6 +916,14 @@ export default async function handler(req: any, res: any) {
         await track("markdown_detected");
       } catch (trackError) {
         console.error("Kunde inte logga markdown-kontroll:", trackError);
+      }
+    }
+
+    if (isOffTopicDecline(reply)) {
+      try {
+        await track("off_topic_declined");
+      } catch (trackError) {
+        console.error("Kunde inte logga avgränsning:", trackError);
       }
     }
 
