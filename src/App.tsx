@@ -1514,6 +1514,7 @@ export default function App() {
 
   return (
     <main style={styles.page} aria-label="Clara hjälpmedelsassistent">
+      <h1 style={styles.srOnly}>Clara</h1>
       <div style={styles.container}>
         <div style={styles.topBar}>
           <div style={styles.topSpacer} />
@@ -1537,7 +1538,7 @@ export default function App() {
             </button>
 
             {menuOpen && (
-              <div style={styles.menuPanel} role="menu" aria-label="Inställningar">
+              <div style={styles.menuPanel} role="group" aria-label="Inställningar">
                 <div style={styles.panelGroup}>
                   <div style={styles.panelLabel}>Textstorlek</div>
 
