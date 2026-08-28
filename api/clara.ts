@@ -541,14 +541,6 @@ function shouldUseGoogleSearch(
     /\b(vilken|vilka|någon|några|tips|förslag)\b[\s\S]{0,40}\b(app|appar|hjälpmedel|tjänst|tjänster)\b/i.test(
       latestUserMessage
     );
-  const namesSpecificApp =
-    /\b(voiceover|talkback|be my eyes|seeing ai|google lens|envision|supersense|lookout|aira|orcam)\b/i.test(
-      latestUserMessage
-    );
-  const describesEverydayProblem =
-    /\b(läsa|se|höra|skriva|navigera|hitta|identifiera|känna igen|förstå|använda|öppna|ringa|betala|handla|zooma|förstora|tillgänglig)\b/i.test(
-      latestUserMessage
-    );
 
   if (asksForLinks || asksForCurrentInfo || asksForVerification) {
     return true;
@@ -558,7 +550,11 @@ function shouldUseGoogleSearch(
     return true;
   }
 
-  if ((namesSpecificApp || describesEverydayProblem) && isFirstQuestion(messages)) {
+  // Första frågan i ett samtal ska alltid söka. Annars riskerar Clara att
+  // gissa appnamn och länkar ur minnet istället för att verifiera dem
+  // (en "eko-maskin"), och det är just då hela svarsstrukturen (Teknik
+  // och Appar) förutsätter att sökning redan skett.
+  if (isFirstQuestion(messages)) {
     return true;
   }
 
