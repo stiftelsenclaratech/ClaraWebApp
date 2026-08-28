@@ -700,11 +700,6 @@ function createStyles(
       alignItems: "center",
       gap: 10,
     },
-    a11yLabel: {
-      fontSize: 14 * scale,
-      fontWeight: 700,
-      color: headingColor,
-    },
     headerRule: {
       border: "none",
       borderBottom: `3px solid ${isDark ? CLARA_WHITE : CLARA_VIOLET}`,
@@ -1334,7 +1329,7 @@ export default function App() {
 
           <div style={styles.a11yBar}>
             <div style={styles.a11yGroup}>
-              <span style={styles.a11yLabel} id="bg-toggle-label">
+              <span style={styles.srOnly} id="bg-toggle-label">
                 Bakgrund
               </span>
               <div
@@ -1364,7 +1359,7 @@ export default function App() {
             </div>
 
             <div style={styles.a11yGroup}>
-              <span style={styles.a11yLabel} id="ts-toggle-label">
+              <span style={styles.srOnly} id="ts-toggle-label">
                 Textstorlek
               </span>
               <div
