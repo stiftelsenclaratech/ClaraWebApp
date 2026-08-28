@@ -740,7 +740,7 @@ function createStyles(
       maxWidth: 32 * 16,
       fontSize: 24 * scale,
       lineHeight: 1.6,
-      color: mutedText,
+      color: mainText,
       margin: "0 auto 28px",
     },
     label: {
