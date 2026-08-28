@@ -704,7 +704,6 @@ function createStyles(
       fontSize: 13 * scale,
       fontWeight: 700,
       color: headingColor,
-      letterSpacing: "0.02em",
     },
     headerRule: {
       border: "none",
@@ -722,8 +721,8 @@ function createStyles(
       boxSizing: "border-box",
     },
     segToggleButton: {
-      padding: "8px 16px",
-      minHeight: 40,
+      padding: "10px 18px",
+      minHeight: 44,
       border: "none",
       cursor: "pointer",
       borderRadius: 999,
@@ -732,7 +731,6 @@ function createStyles(
       fontFamily: "inherit",
       fontWeight: 700,
       fontSize: 14 * scale,
-      letterSpacing: "0.01em",
     },
     segToggleButtonActive: {
       background: CLARA_YELLOW,
@@ -750,7 +748,6 @@ function createStyles(
       lineHeight: 1.6,
       color: mutedText,
       margin: "0 auto 28px",
-      letterSpacing: "0.01em",
     },
     label: {
       display: "block",
@@ -759,7 +756,6 @@ function createStyles(
       marginBottom: 12,
       color: headingColor,
       textAlign: "left",
-      letterSpacing: "0.01em",
     },
     textarea: {
       width: "100%",
@@ -775,7 +771,6 @@ function createStyles(
       background: fieldBackground,
       color: mainText,
       fontFamily: "inherit",
-      letterSpacing: "0.01em",
     },
     primaryButton: {
       width: "100%",
@@ -788,7 +783,6 @@ function createStyles(
       fontWeight: 700,
       cursor: "pointer",
       boxShadow: buttonShadow,
-      letterSpacing: "0.01em",
     },
     primaryButtonDisabled: {
       opacity: 0.6,
@@ -802,7 +796,6 @@ function createStyles(
       fontWeight: 700,
       color: headingColor,
       marginBottom: 12,
-      letterSpacing: "0.02em",
     },
     chips: {
       display: "flex",
@@ -833,7 +826,6 @@ function createStyles(
       fontSize: 13 * scale,
       fontWeight: 700,
       color: softText,
-      letterSpacing: "0.05em",
       textTransform: "uppercase",
     },
     actionsWrap: {
@@ -852,7 +844,6 @@ function createStyles(
       fontSize: 17 * scale,
       fontWeight: 700,
       cursor: "pointer",
-      letterSpacing: "0.01em",
     },
     replyHeading: {
       margin: "20px 0 8px 0",
@@ -860,7 +851,6 @@ function createStyles(
       fontWeight: 700,
       color: headingColor,
       lineHeight: 1.35,
-      letterSpacing: "0.01em",
     },
     replySubheading: {
       margin: "16px 0 6px 0",
@@ -868,14 +858,12 @@ function createStyles(
       fontWeight: 700,
       color: headingColor,
       lineHeight: 1.4,
-      letterSpacing: "0.01em",
     },
     replyParagraph: {
       margin: "0 0 14px 0",
       lineHeight: 1.7,
       color: mainText,
       fontSize: 19 * scale,
-      letterSpacing: "0.01em",
     },
     replyList: {
       margin: "0 0 14px 0",
@@ -883,7 +871,6 @@ function createStyles(
       color: mainText,
       fontSize: 19 * scale,
       lineHeight: 1.7,
-      letterSpacing: "0.01em",
     },
     replyListItem: {
       marginBottom: 8,
@@ -913,7 +900,6 @@ function createStyles(
       lineHeight: 1.6,
       whiteSpace: "pre-wrap",
       wordBreak: "break-word",
-      letterSpacing: "0.01em",
     },
     thinkingText: {
       margin: 0,
@@ -948,7 +934,6 @@ function createStyles(
       background: fieldBackground,
       color: mainText,
       fontFamily: "inherit",
-      letterSpacing: "0.01em",
     },
     conversationActions: {
       display: "flex",
@@ -990,7 +975,6 @@ function createStyles(
       fontSize: 15 * scale,
       fontWeight: 700,
       cursor: "pointer",
-      letterSpacing: "0.01em",
     },
     // Vald status är alltid solrosgul fyllning + svart text, i både ljust
     // och mörkt läge - manualens regel för valda kontroller (AA/AAA,
