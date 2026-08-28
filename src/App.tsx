@@ -53,7 +53,6 @@ type ActionFeedbackState = {
 };
 
 type AnnouncementState = {
-  key: number;
   text: string;
 };
 
@@ -1001,7 +1000,6 @@ export default function App() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [textScale, setTextScale] = useState(TEXT_SCALE_DEFAULT);
   const [announcement, setAnnouncement] = useState<AnnouncementState>({
-    key: 0,
     text: "",
   });
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState>({
@@ -1151,10 +1149,7 @@ export default function App() {
       const assistantMessage = createMessage("assistant", result);
 
       setMessages((prev) => [...prev, assistantMessage]);
-      setAnnouncement((prev) => ({
-        key: prev.key + 1,
-        text: result,
-      }));
+      announce(result);
     } finally {
       setLoading(false);
     }
@@ -1168,15 +1163,24 @@ export default function App() {
     await runQuery(example);
   }
 
+  // VoiceOver (Safari) missar ibland uppläsningen om texten bara byts i en
+  // redan monterad live-region - det behövs en tydlig mutation. Att bara
+  // nyckel-remontera elementet (tidigare lösning) visade sig opålitligt i
+  // riktig VoiceOver-testning. Töm den istället och sätt texten en liten
+  // stund senare, så det alltid blir en riktig från-tomt-till-fyllt-ändring.
+  function announce(text: string) {
+    setAnnouncement({ text: "" });
+    window.setTimeout(() => {
+      setAnnouncement({ text });
+    }, 50);
+  }
+
   function handleResetConversation() {
     stopSpeaking();
     setMessages([]);
     setProblem("");
     setLoading(false);
-    setAnnouncement((prev) => ({
-      key: prev.key + 1,
-      text: "Samtalet började om.",
-    }));
+    announce("Samtalet började om.");
     setActionFeedback({ messageId: null, text: "" });
   }
 
@@ -1243,10 +1247,7 @@ export default function App() {
     setTextScale(next);
 
     if (next <= TEXT_SCALE_MIN) {
-      setAnnouncement((prev) => ({
-        key: prev.key + 1,
-        text: "Minsta textstorleken. Kan inte bli mindre.",
-      }));
+      announce("Minsta textstorleken. Kan inte bli mindre.");
     }
   }
 
@@ -1255,10 +1256,7 @@ export default function App() {
     setTextScale(next);
 
     if (next >= TEXT_SCALE_MAX) {
-      setAnnouncement((prev) => ({
-        key: prev.key + 1,
-        text: "Största textstorleken. Kan inte bli större.",
-      }));
+      announce("Största textstorleken. Kan inte bli större.");
     }
   }
 
@@ -1676,7 +1674,6 @@ export default function App() {
         <div ref={conversationEndRef} />
 
         <p
-          key={announcement.key}
           style={styles.srOnly}
           role="status"
           aria-live="polite"
