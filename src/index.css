@@ -30,6 +30,14 @@ input {
   font: inherit;
 }
 
+/* Stiftelsen Claras fokusregel: alltid en 3px solrosgul ring med 2px
+   avstånd, aldrig borttagen. */
+:focus-visible {
+  outline: 3px solid #FEB93C;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 img {
   max-width: 100%;
 }

@@ -621,74 +621,14 @@ function MenuIcon({
   );
 }
 
-function SunIcon({
-  size = 20,
-  color = CLARA_VIOLET,
-}: {
-  size?: number;
-  color?: string;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="4.5" fill={color} />
-      <path
-        d="M12 1.8V4.2M12 19.8V22.2M4.2 12H1.8M22.2 12H19.8M5.1 5.1L6.8 6.8M17.2 17.2L18.9 18.9M18.9 5.1L17.2 6.8M6.8 17.2L5.1 18.9"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MoonIcon({
-  size = 20,
-  color = CLARA_VIOLET,
-}: {
-  size?: number;
-  color?: string;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M20 14.2C19.2 14.5 18.4 14.6 17.5 14.6C13.4 14.6 10.1 11.3 10.1 7.2C10.1 5.8 10.5 4.5 11.2 3.4C6.8 3.9 3.4 7.7 3.4 12.2C3.4 17.1 7.3 21 12.2 21C16.7 21 20.5 17.6 21 13.2C20.7 13.6 20.4 13.9 20 14.2Z"
-        fill={color}
-      />
-    </svg>
-  );
-}
-
-function ThemePreviewIcon({
-  mode,
-  size = 20,
-  color = CLARA_VIOLET,
-}: {
-  mode: ThemeMode;
-  size?: number;
-  color?: string;
-}) {
-  if (mode === "dark") {
-    return <MoonIcon size={size} color={color} />;
-  }
-
-  return <SunIcon size={size} color={color} />;
-}
-
 function getThemeLabel(mode: ThemeMode) {
   if (mode === "dark") return "Mörkt läge";
   return "Ljust läge";
+}
+
+function getThemeShortLabel(mode: ThemeMode) {
+  if (mode === "dark") return "Mörk";
+  return "Ljus";
 }
 
 function getThemeLogo(mode: ThemeMode) {
@@ -702,28 +642,37 @@ function createStyles(
   const scale = getFontScale(textSizeStep);
   const isDark = activeTheme === "dark";
 
-  const pageBackground = isDark ? CLARA_BLACK : CLARA_WHITE;
-  const panelBackground = isDark ? "#0F0F0F" : "#F7F5FA";
-  const fieldBackground = isDark ? "#050505" : CLARA_WHITE;
-  const menuBackground = isDark ? "#101010" : CLARA_WHITE;
+  // Följer Stiftelsen Claras designsystem: Mörkt läge är en viol sida med
+  // vit text och solrosgula accenter, aldrig svart. Skuggor undviks helt
+  // (identiteten bygger på konturer, inte skugga) utom på det flytande
+  // inställningspanelen.
+  const pageBackground = isDark ? CLARA_VIOLET : CLARA_WHITE;
+  const panelBackground = isDark ? CLARA_VIOLET : "#F7F5FA";
+  const fieldBackground = isDark ? CLARA_VIOLET : CLARA_WHITE;
+  const menuBackground = isDark ? CLARA_VIOLET : CLARA_WHITE;
   const borderColor = isDark
-    ? "1px solid rgba(255, 255, 255, 0.18)"
-    : `1px solid ${CLARA_LIGHT_VIOLET}`;
+    ? `2px solid ${CLARA_WHITE}`
+    : `2px solid ${CLARA_VIOLET}`;
   const subtleBorder = isDark
-    ? "1px solid rgba(255, 255, 255, 0.12)"
-    : "1px solid rgba(52, 34, 92, 0.10)";
+    ? "2px solid rgba(201, 196, 212, 0.45)"
+    : `2px solid ${CLARA_LIGHT_VIOLET}`;
   const mainText = isDark ? CLARA_WHITE : CLARA_BLACK;
   const mutedText = isDark ? "rgba(255, 255, 255, 0.78)" : "rgba(52, 34, 92, 0.84)";
   const softText = isDark ? "rgba(255, 255, 255, 0.70)" : "rgba(0, 0, 0, 0.72)";
   const headingColor = isDark ? CLARA_WHITE : CLARA_VIOLET;
   const accentColor = isDark ? CLARA_YELLOW : CLARA_VIOLET;
-  const actionSurface = isDark ? "rgba(255, 255, 255, 0.04)" : CLARA_WHITE;
-  const chipSurface = isDark ? "rgba(255, 255, 255, 0.03)" : "#F6F2FB";
-  const userBubbleBackground = isDark ? CLARA_VIOLET : CLARA_LIGHT_VIOLET;
+  const actionSurface = "transparent";
+  const chipSurface = "transparent";
+  const userBubbleBackground = isDark
+    ? "color-mix(in srgb, #34225C 70%, #000000)"
+    : CLARA_LIGHT_VIOLET;
   const userBubbleText = isDark ? CLARA_WHITE : CLARA_BLACK;
-  const buttonShadow = isDark
-    ? "none"
-    : "0 18px 30px rgba(52, 34, 92, 0.08)";
+  const buttonShadow = "none";
+  const overlayShadow = "0 12px 32px rgba(52, 34, 92, 0.18)";
+  // Primärknappen byter till solrosgul/svart i mörkt läge, annars
+  // försvinner den mot den viola sidan.
+  const primaryBg = isDark ? CLARA_YELLOW : CLARA_VIOLET;
+  const primaryFg = isDark ? CLARA_BLACK : CLARA_WHITE;
 
   return {
     page: {
@@ -774,7 +723,7 @@ function createStyles(
     menuButton: {
       width: 56,
       height: 56,
-      borderRadius: 18,
+      borderRadius: 999,
       border: borderColor,
       background: actionSurface,
       cursor: "pointer",
@@ -791,7 +740,7 @@ function createStyles(
       background: menuBackground,
       border: borderColor,
       borderRadius: 20,
-      boxShadow: buttonShadow,
+      boxShadow: overlayShadow,
       padding: 18,
       zIndex: 20,
       textAlign: "left",
@@ -815,29 +764,34 @@ function createStyles(
       margin: "4px 0",
       border: "none",
     },
-    themeOptions: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 8,
-    },
-    themeOption: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 10,
-      width: "100%",
-      padding: "14px 12px",
-      borderRadius: 14,
+    // Segmenterad pill-brytpunkt (Ljus/Mörk), samma mönster som
+    // stiftelsenclara.fi använder för sina läsarkontroller.
+    segToggle: {
+      display: "inline-flex",
+      padding: 3,
+      gap: 3,
       border: borderColor,
-      background: actionSurface,
-      color: mainText,
-      cursor: "pointer",
-      textAlign: "center",
-      fontSize: 16 * scale,
-      fontWeight: 700,
+      borderRadius: 999,
+      width: "100%",
+      boxSizing: "border-box",
     },
-    themeOptionActive: {
-      border: `2px solid ${accentColor}`,
+    segToggleButton: {
+      flex: 1,
+      padding: "10px 12px",
+      minHeight: 40,
+      border: "none",
+      cursor: "pointer",
+      borderRadius: 999,
+      background: "transparent",
+      color: mainText,
+      fontFamily: "inherit",
+      fontWeight: 700,
+      fontSize: 15 * scale,
+      letterSpacing: "0.01em",
+    },
+    segToggleButtonActive: {
+      background: CLARA_YELLOW,
+      color: CLARA_BLACK,
     },
     textRow: {
       display: "flex",
@@ -847,7 +801,7 @@ function createStyles(
     sizeButton: {
       width: 56,
       height: 56,
-      borderRadius: 18,
+      borderRadius: 999,
       border: borderColor,
       background: actionSurface,
       color: mainText,
@@ -887,7 +841,7 @@ function createStyles(
       width: "100%",
       minHeight: 144,
       padding: 20,
-      borderRadius: 20,
+      borderRadius: 12,
       border: borderColor,
       fontSize: 20 * scale,
       lineHeight: 1.6,
@@ -902,10 +856,10 @@ function createStyles(
     primaryButton: {
       width: "100%",
       padding: "17px 20px",
-      borderRadius: 18,
-      border: `1px solid ${CLARA_VIOLET}`,
-      background: CLARA_VIOLET,
-      color: CLARA_WHITE,
+      borderRadius: 999,
+      border: `2px solid ${primaryBg}`,
+      background: primaryBg,
+      color: primaryFg,
       fontSize: 18 * scale,
       fontWeight: 700,
       cursor: "pointer",
@@ -935,7 +889,7 @@ function createStyles(
     chip: {
       padding: "14px 20px",
       borderRadius: 999,
-      border: subtleBorder,
+      border: borderColor,
       background: chipSurface,
       color: mainText,
       cursor: "pointer",
@@ -945,7 +899,7 @@ function createStyles(
     answerBox: {
       marginTop: 24,
       background: panelBackground,
-      borderRadius: 24,
+      borderRadius: 20,
       padding: 26,
       textAlign: "left",
       border: subtleBorder,
@@ -967,7 +921,7 @@ function createStyles(
     secondaryButton: {
       width: "100%",
       padding: "15px 18px",
-      borderRadius: 18,
+      borderRadius: 999,
       border: borderColor,
       background: actionSurface,
       color: mainText,
@@ -988,7 +942,7 @@ function createStyles(
       margin: "16px 0 6px 0",
       fontSize: 20 * scale,
       fontWeight: 700,
-      color: accentColor,
+      color: headingColor,
       lineHeight: 1.4,
       letterSpacing: "0.01em",
     },
@@ -1061,7 +1015,7 @@ function createStyles(
       width: "100%",
       minHeight: 120,
       padding: 20,
-      borderRadius: 20,
+      borderRadius: 12,
       border: borderColor,
       fontSize: 19 * scale,
       lineHeight: 1.6,
@@ -1105,7 +1059,7 @@ function createStyles(
     },
     satisfactionButton: {
       padding: "10px 16px",
-      borderRadius: 14,
+      borderRadius: 999,
       border: borderColor,
       background: actionSurface,
       color: mainText,
@@ -1114,10 +1068,13 @@ function createStyles(
       cursor: "pointer",
       letterSpacing: "0.01em",
     },
+    // Vald status är alltid solrosgul fyllning + svart text, i både ljust
+    // och mörkt läge - manualens regel för valda kontroller (AA/AAA,
+    // Ljus/Mörk, kryssrutor), inte temats accentfärg.
     satisfactionButtonActive: {
-      background: accentColor,
-      color: CLARA_WHITE,
-      border: "none",
+      background: CLARA_YELLOW,
+      color: CLARA_BLACK,
+      border: `2px solid ${CLARA_YELLOW}`,
     },
     srOnly: {
       position: "absolute",
@@ -1421,12 +1378,6 @@ export default function App() {
     return `Textstorlek nivå ${textSizeStep + 5} av 15.`;
   }
 
-  function getThemeOptionAriaLabel(mode: ThemeMode) {
-    return `${getThemeLabel(mode)}. ${
-      themeMode === mode ? "Valt läge." : "Välj detta läge."
-    }`;
-  }
-
   function buildConversationExportText() {
     if (!messages.length) {
       return "Samtalet är tomt.";
@@ -1566,35 +1517,31 @@ export default function App() {
 
                   <hr style={styles.panelDivider} />
 
-                  <div style={styles.panelLabel}>Tema</div>
+                  <div style={styles.panelLabel} id="theme-toggle-label">Bakgrund</div>
 
-                  <div style={styles.themeOptions}>
-                    {(["light", "dark"] as ThemeMode[]).map(
-                      (mode) => (
+                  <div
+                    style={styles.segToggle}
+                    role="group"
+                    aria-labelledby="theme-toggle-label"
+                  >
+                    {(["light", "dark"] as ThemeMode[]).map((mode) => {
+                      const active = themeMode === mode;
+                      return (
                         <button
                           key={mode}
                           type="button"
                           onClick={() => setThemeMode(mode)}
                           style={{
-                            ...styles.themeOption,
-                            ...(themeMode === mode ? styles.themeOptionActive : {}),
+                            ...styles.segToggleButton,
+                            ...(active ? styles.segToggleButtonActive : {}),
                           }}
-                          aria-label={getThemeOptionAriaLabel(mode)}
+                          aria-pressed={active}
                           title={getThemeLabel(mode)}
                         >
-                          <ThemePreviewIcon
-                            mode={mode}
-                            size={22}
-                            color={
-                              themeMode === "dark" && themeMode === mode
-                                ? CLARA_YELLOW
-                                : themeIconColor
-                            }
-                          />
-                          <span>{getThemeLabel(mode)}</span>
+                          {getThemeShortLabel(mode)}
                         </button>
-                      )
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
