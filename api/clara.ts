@@ -671,8 +671,17 @@ function collectErrorTexts(error: unknown, depth = 0): string[] {
       }
     }
 
-    for (const key of ["cause", "error", "response", "body", "data"]) {
+    for (const key of ["cause", "error", "response", "body", "data", "lastError"]) {
       texts.push(...collectErrorTexts(record[key], depth + 1));
+    }
+
+    // AI SDK:s RetryError samlar de misslyckade försöken i en "errors"-lista
+    // istället för cause/error - annars missas t.ex. Googles kvot-/
+    // betalningsfel som bara syns där (sågs i produktion 2026-09-03).
+    if (Array.isArray(record.errors)) {
+      for (const nested of record.errors) {
+        texts.push(...collectErrorTexts(nested, depth + 1));
+      }
     }
 
     return texts;
@@ -703,10 +712,21 @@ function getErrorStatusCode(error: unknown): number | null {
     }
   }
 
-  for (const key of ["cause", "error", "response", "body", "data"]) {
+  for (const key of ["cause", "error", "response", "body", "data", "lastError"]) {
     const nestedStatusCode = getErrorStatusCode(record[key]);
     if (nestedStatusCode !== null) {
       return nestedStatusCode;
+    }
+  }
+
+  // Samma RetryError-fall som ovan: statuskoden sitter bara på de enskilda
+  // felen i "errors"-listan, inte på RetryError-objektet självt.
+  if (Array.isArray(record.errors)) {
+    for (const nested of record.errors) {
+      const nestedStatusCode = getErrorStatusCode(nested);
+      if (nestedStatusCode !== null) {
+        return nestedStatusCode;
+      }
     }
   }
 
