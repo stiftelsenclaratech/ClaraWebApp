@@ -1,8 +1,19 @@
+import { generateText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+
 // Lättviktig hälsokontroll för extern övervakning (t.ex. UptimeRobot).
-// Anropar ALDRIG Gemini för att generera ett svar - det skulle kosta
-// pengar per kontroll och tömma samma kvot som appen själv använder.
-// Istället hämtas bara modellens metadata, vilket inte är en betald
-// generering.
+//
+// En tidigare version anropade bara Googles modell-metadata (GET, ingen
+// generering) för att undvika kostnad - men det visade sig INTE räcka:
+// den kvoten är separat från själva svarsgenereringen, så kontrollen
+// svarade "ok" 2026-09-03 trots att riktiga chattsvar redan misslyckades
+// med 429 "prepayment credits depleted". En hälsokontroll som inte
+// upptäcker det faktiska felet är värdelös.
+//
+// Den här versionen gör därför en riktig, men mikroskopisk, generering
+// (maxOutputTokens 5, inget "tänkande", inget systemprompt, ingen sökning)
+// för att faktiskt testa samma kvot som appen använder - till en bråkdel
+// av kostnaden för ett riktigt svar.
 
 type ApiResponse = {
   setHeader(name: string, value: string): void;
@@ -15,8 +26,38 @@ type ApiRequest = {
   method?: string;
 };
 
-const GOOGLE_MODEL_INFO_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest";
+function getErrorStatusCode(error: unknown, depth = 0): number | null {
+  if (!error || typeof error !== "object" || depth > 4) {
+    return null;
+  }
+
+  const record = error as Record<string, unknown>;
+
+  for (const key of ["statusCode", "status"]) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  for (const key of ["cause", "error", "response", "body", "data", "lastError"]) {
+    const nested = getErrorStatusCode(record[key], depth + 1);
+    if (nested !== null) {
+      return nested;
+    }
+  }
+
+  if (Array.isArray(record.errors)) {
+    for (const nested of record.errors) {
+      const nestedStatusCode = getErrorStatusCode(nested, depth + 1);
+      if (nestedStatusCode !== null) {
+        return nestedStatusCode;
+      }
+    }
+  }
+
+  return null;
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   res.setHeader("Cache-Control", "no-store");
@@ -32,25 +73,36 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
-    const response = await fetch(`${GOOGLE_MODEL_INFO_URL}?key=${apiKey}`, {
-      method: "GET",
+    const google = createGoogleGenerativeAI({ apiKey });
+
+    await generateText({
+      model: google("gemini-flash-latest"),
+      prompt: "hej",
+      maxOutputTokens: 5,
+      maxRetries: 0,
+      providerOptions: {
+        google: {
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      },
     });
 
-    if (response.ok) {
-      return res.status(200).json({ status: "ok" });
-    }
+    return res.status(200).json({ status: "ok" });
+  } catch (error) {
+    // Detaljerna loggas server-side, aldrig till den som anropar
+    // hälsokontrollen.
+    console.error("Clara health check misslyckades:", error);
 
-    // 429 = kvoten/krediten är slut, 4xx för nyckeln = fel/återkallad nyckel.
-    // Detaljerna loggas server-side, aldrig till den som anropar hälsokontrollen.
-    console.error("Clara health check misslyckades:", response.status);
+    const statusCode = getErrorStatusCode(error);
 
-    if (response.status === 429) {
+    if (statusCode === 429) {
       return res.status(503).json({ status: "error", reason: "QUOTA_EXCEEDED" });
     }
 
+    if (statusCode === 401 || statusCode === 403) {
+      return res.status(503).json({ status: "error", reason: "INVALID_KEY" });
+    }
+
     return res.status(503).json({ status: "error", reason: "GOOGLE_API_ERROR" });
-  } catch (error) {
-    console.error("Clara health check kunde inte nå Google:", error);
-    return res.status(503).json({ status: "error", reason: "UNREACHABLE" });
   }
 }
