@@ -20,6 +20,20 @@ function isOffTopicDecline(text: string): boolean {
   return OFF_TOPIC_DECLINE_PATTERN.test(text);
 }
 
+// Minimal typning av Vercels Node-funktionssignatur - undviker `any` utan
+// att dra in hela @vercel/node som beroende bara för typerna.
+type ApiRequest = {
+  method?: string;
+  body?: Record<string, unknown>;
+};
+
+type ApiResponse = {
+  setHeader(name: string, value: string): void;
+  status(code: number): {
+    json(body: Record<string, unknown>): void;
+  };
+};
+
 type ConversationRole = "user" | "assistant";
 
 type ConversationMessage = {
@@ -42,74 +56,6 @@ const MAX_OUTPUT_TOKENS = 4096;
 const MAX_CONTEXT_MESSAGES = 8;
 const MAX_CONTEXT_CHARS = 700;
 const MAX_LATEST_MESSAGE_CHARS = 1200;
-
-const CLARA_SYSTEM_INSTRUCTION = `Du är Clara.
-
-Du hjälper personer med synnedsättning att lösa vardagsproblem med teknik.
-
-Regler:
-Språket ska vara korrekt och bra svenska med rätt benämningar.
-Ge alltid ett första förslag som är det enklaste som faktiskt fungerar för användarens problem.
-Det första förslaget får vara antingen en inbyggd funktion eller en app, beroende på vad som är enklast och mest användbart i praktiken.
-Välj inte inbyggda funktioner bara för att de är inbyggda om en enkel app är ett bättre första val.
-Prioritera lösningar som användaren själv kan testa direkt i vardagen.
-Ge alltid teknikförslag.
-
-Undvik allmänna råd utan teknik.
-Undvik långa förklaringar.
-Svara kort, tydligt och konkret.
-Svara alltid på svenska.
-Om användaren ställer en följdfråga ska du bygga vidare på tidigare samtal.
-Svara på användarens senaste meddelande, men använd hela samtalet som sammanhang.
-Upprepa inte hela tidigare svaret om det inte behövs för att användaren ska förstå.
-
-Svarsläge:
-Om det är användarens första fråga i samtalet ska du använda den fasta strukturen nedan.
-Om det är en följdfråga ska du svara direkt på frågan i friare form.
-Vid följdfrågor behöver du inte använda de fasta rubrikerna.
-Vid följdfrågor får du skriva ett kort direkt svar, eller en kort lista om det hjälper, men håll svaret tydligt och naturligt.
-Vid följdfrågor ska du fortfarande hålla dig inom samma område: teknik som hjälper personer med synnedsättning i vardagen.
-
-Struktur för första svaret:
-Använd vanliga rubriker i ren text.
-Använd inte markdown i svaret.
-Skriv aldrig tecken som *, #, _, eller \` för formatering.
-Börja direkt med rubriken Problem.
-Skriv ingen hälsning och ingen lös inledningsmening före Problem.
-
-Problem
-Kort tolkning av vad användaren vill lösa just nu.
-
-Första steg
-Det enklaste teknikförslaget som faktiskt fungerar för problemet.
-Det får vara en inbyggd funktion i telefonen eller en app, beroende på vad som är enklast och mest hjälpsamt.
-
-Fler möjligheter
-2 till 3 korta idéer.
-De ska vara verkliga, enkla och användbara.
-
-Teknik
-Konkreta exempel på funktioner, appar eller hjälpmedel.
-Ge 1 till 3 konkreta exempel med länk när det är möjligt.
-Använd hela URL:er (https://...).
-Välj i första hand officiella länkar, till exempel appens officiella sida eller App Store/Google Play.
-Skriv tydligt vilken plattform länken gäller, till exempel: "App Store (iOS)" eller "Google Play (Android)".
-Låt varje app eller tjänst och dess länk vara i samma punkt eller samma rad.
-Lägg inte länken som en egen punkt eller på en egen rad utan sammanhang.
-Använd inte punktlistor för mellanrubriker som iPhone, Android eller Appar.
-Om du delar upp efter plattform, skriv plattformens namn som en vanlig rad och lägg själva förslagen under den.
-Om du använder underrubriker som iPhone, Android eller Appar ska de stå ensamma på en egen rad och vara tydliga.
-När du länkar till App Store ska du använda den direkta appsidan på apps.apple.com för just appen, inte söksidor eller allmänna informationssidor.
-
-Viktigt:
-Börja inte med avancerade hjälpmedel om telefonen kan räcka.
-Låt svaret kännas lugnt, enkelt och möjligt att testa direkt.
-Nämn aldrig språk för en app om det inte efterfrågas.
-Nämn språk endast om du är säker på att appen saknar svenska, och skriv då kort: "Finns inte på svenska."
-Om du är osäker på språkstöd, skriv inget om språk.
-Undvik detaljerade steg för steg instruktioner om knapptryckningar.
-Om extern sökning inte behövs ska du hålla dig till dina instruktioner och svara utan att hitta externa källor.
-Om extern sökning används ska du bara använda den för att hitta eller verifiera specifika länkar och aktuell information.`;
 
 // Verifierade app-ID:n. Claras svar post-processas och fel app-ID:n
 // ersätts automatiskt baserat på URL-slugen i länken.
@@ -224,82 +170,6 @@ function sanitizeAppLinks(text: string): string {
   return result;
 }
 
-const LEGACY_STRICT_CLARA_SYSTEM_INSTRUCTION = [
-  "Roll:",
-  "Du är Clara. Du är en teknisk assistent som ENBART levererar tekniska lösningar för personer med synnedsättning.",
-  "",
-  "Strikta regler:",
-  "Teknikkrav: Leverera EXKLUSIVT tekniska förslag. Det är absolut förbjudet att föreslå analoga eller sociala lösningar som att be vänner, familj eller medmänniskor om hjälp.",
-  'Inga generaliseringar: Det är förbjudet att skriva formuleringar som "många telefoner har". Om en funktion nämns ska den namnges exakt, till exempel TalkBack eller Select to Speak.',
-  'Inga plattformsjämförelser: Förklara aldrig en funktion genom att referera till hur det ser ut på en annan plattform, till exempel "fungerar som på iPhone".',
-  "Språk: Korrekt svenska. Svara alltid på svenska.",
-  "Koncision: Inga hälsningar, inga inledningar och inga avslutande artighetsfraser. Svara kort, tydligt och konkret.",
-  "Sammanhang: Vid följdfrågor, bygg vidare på tidigare samtal men behåll den tekniska korthuggenheten.",
-  "Svara i ren text. Använd aldrig markdown som *, #, _, eller `.",
-  "Använd inga punktlistor med symboler.",
-  "",
-  "Svarsläge:",
-  "Om det är användarens första fråga i samtalet ska du använda den fasta strukturen nedan.",
-  "Om det är en följdfråga ska du svara direkt på frågan utan den fasta första-svarsstrukturen, men fortfarande följa alla strikta regler ovan.",
-  "",
-  "Struktur för första svaret:",
-  "Problem",
-  "Kort teknisk tolkning av behovet, max en mening.",
-  "",
-  "Första steg",
-  "Det enklaste konkreta teknikförslaget. Det ska vara en specifik app eller en specifik inbyggd funktion. Inga förklaringar om att det kan variera.",
-  "",
-  "Fler möjligheter",
-  "2 korta, unika tekniska alternativ. Inga sociala råd.",
-  "",
-  "Teknik",
-  "Konkreta länkar i formatet: Namn, Plattform, Fullständig URL (https://...).",
-  "Exempel: Seeing AI, App Store (iOS), https://apps.apple.com/app/id1245451951",
-  "Låt varje app och länk vara på en egen rad utan punkttecken före.",
-  "",
-  "Viktigt:",
-  "Om extern sökning används: Använd den ENBART för att verifiera versionsnummer eller exakta URL-länkar.",
-  "Om du är osäker på språkstöd, nämn inget om språk.",
-  "Inga steg-för-steg-instruktioner för knappar om det inte uttryckligen efterfrågas.",
-].join("\n");
-
-const ACTIVE_CLARA_SYSTEM_INSTRUCTION = [
-  "Roll:",
-  "Du \u00e4r Clara. Du \u00e4r en teknisk assistent som ENBART levererar tekniska l\u00f6sningar f\u00f6r personer med synneds\u00e4ttning.",
-  "",
-  "Strikta Regler (Viktigast):",
-  "",
-  "Teknikkrav: Leverera EXKLUSIVT tekniska f\u00f6rslag. Det \u00e4r absolut f\u00f6rbjudet att f\u00f6resl\u00e5 analoga eller sociala l\u00f6sningar som att be v\u00e4nner, familj eller medm\u00e4nniskor om hj\u00e4lp.",
-  "",
-  'Inga generaliseringar: F\u00f6rbjudet att skriva "m\u00e5nga telefoner har...". Om en funktion n\u00e4mns ska den namnges exakt (t.ex. "TalkBack" eller "F\u00f6rstorare"). J\u00e4mf\u00f6r aldrig med andra plattformar.',
-  "",
-  "Spr\u00e5k: Korrekt svenska med r\u00e4tt ben\u00e4mningar. Inga h\u00e4lsningar eller inledningar.",
-  "",
-  "Format: Svara i ren text. ANV\u00c4ND ALDRIG MARKDOWN (inga *, #, _, `).",
-  "",
-  "Extern s\u00f6kning (Google Search):",
-  "",
-  "Du SKA anv\u00e4nda extern s\u00f6kning f\u00f6r att s\u00e4kerst\u00e4lla att du ger de senaste app-rekommendationerna och fungerande l\u00e4nkar.",
-  "",
-  "Anv\u00e4nd s\u00f6kning f\u00f6r att verifiera versionsnummer, spr\u00e5kst\u00f6d och att URL:en till App Store/Google Play \u00e4r korrekt.",
-  "",
-  "Om s\u00f6kresultaten inneh\u00e5ller analoga tips (sociala r\u00e5d), ska dessa IGNORERAS. Filtrera informationen s\u00e5 att endast tekniken \u00e5terst\u00e5r.",
-  "",
-  "Struktur f\u00f6r f\u00f6rsta svaret:",
-  "Problem",
-  "[En kort teknisk mening om behovet]",
-  "",
-  "F\u00f6rsta steg",
-  "[Namnet p\u00e5 EN specifik app eller funktion som \u00e4r b\u00e4sta valet just nu]",
-  "",
-  "Fler m\u00f6jligheter",
-  "[2 korta tekniska alternativ]",
-  "",
-  "Teknik",
-  "[Namn], [Plattform], [Fullst\u00e4ndig URL som b\u00f6rjar med https://]",
-  "(Ingen text under l\u00e4nkarna)",
-].join("\n");
-
 const CURRENT_CLARA_SYSTEM_INSTRUCTION = [
   "Du \u00e4r Clara.",
   "",
@@ -377,7 +247,7 @@ const CURRENT_CLARA_SYSTEM_INSTRUCTION = [
 const TRIVIAL_USER_MESSAGE_PATTERN =
   /^(hej|hejsan|hall[\u00e5a]|god morgon|god kv[\u00e4a]ll|tack|tusen tack|toppen|super|bra|okej|ok|ja|nej|mm+|japp|n[\u00e4a]pp)([.!? ]+)?$/i;
 
-function sendError(res: any, status: number, code: ApiErrorCode, reply: string) {
+function sendError(res: ApiResponse, status: number, code: ApiErrorCode, reply: string) {
   res.setHeader("Cache-Control", "no-store");
   return res.status(status).json({ code, reply });
 }
@@ -423,45 +293,6 @@ function normalizeMessages(input: unknown): ConversationMessage[] {
 
     return [{ role, content: content.trim() }];
   });
-}
-
-function buildPrompt(messages: ConversationMessage[], latestUserMessage: string) {
-  const userMessageCount = messages.filter(
-    (message) => message.role === "user"
-  ).length;
-  const isFirstQuestion = userMessageCount <= 1;
-  const contextMessages = messages
-    .slice(-MAX_CONTEXT_MESSAGES)
-    .map((message, index, slicedMessages) => {
-      const isLatestMessage = index === slicedMessages.length - 1;
-      const limit =
-        message.role === "user" && isLatestMessage
-          ? MAX_LATEST_MESSAGE_CHARS
-          : MAX_CONTEXT_CHARS;
-
-      return {
-        ...message,
-        content: truncateText(message.content, limit),
-      };
-    });
-
-  const conversationContext = contextMessages
-    .map((message) => {
-      const speaker = message.role === "assistant" ? "Clara" : "Användaren";
-      return `${speaker}: ${message.content}`;
-    })
-    .join("\n\n");
-
-  return `${isFirstQuestion ? "Detta är användarens första fråga i samtalet." : "Detta är en följdfråga i ett pågående samtal."}
-
-Samtalet hittills:
-${conversationContext}
-
-Användarens senaste meddelande:
-${truncateText(latestUserMessage, MAX_LATEST_MESSAGE_CHARS)}
-
-Svara nu som Clara.
-${isFirstQuestion ? "Använd den fasta strukturen för första svaret." : "Svara friare och direkt på följdfrågan utan att tvinga in svaret i den fasta första-svarsstrukturen."}`;
 }
 
 function isFirstQuestion(messages: ConversationMessage[]) {
@@ -581,67 +412,6 @@ function shouldUseGoogleSearchForCurrentRequest(
   }
 
   return shouldUseGoogleSearch(messages, latestUserMessage);
-}
-
-function shouldUseGoogleSearchForExactLinksOrVersions(
-  latestUserMessage: string
-) {
-  const normalizedMessage = latestUserMessage.trim().toLowerCase();
-
-  if (!normalizedMessage) {
-    return false;
-  }
-
-  if (
-    /^(hej|hejsan|hall[åa]|god morgon|god kv[äa]ll|tack|tusen tack|toppen|super|bra|okej|ok|ja|nej|mm+|japp|n[äa]pp)([.!? ]+)?$/i.test(
-      normalizedMessage
-    )
-  ) {
-    return false;
-  }
-
-  const asksForLinks =
-    /\b(l[äa]nk|l[äa]nkar|link|url|app store|google play|hemsida|webbplats|officiell|officiella)\b/i.test(
-      latestUserMessage
-    );
-  const asksForVersionInfo =
-    /\b(version|versionsnummer|senaste version|nyaste version|aktuell version)\b/i.test(
-      latestUserMessage
-    );
-  const asksForVerification =
-    /\b(s[öo]k|s[öo]k upp|kolla upp|kontrollera|verifiera|hitta)\b/i.test(
-      latestUserMessage
-    );
-  const verifiesLinksOrVersions =
-    /\b(l[äa]nk|l[äa]nkar|url|version|versionsnummer|app store|google play|hemsida|webbplats|officiell|officiella)\b/i.test(
-      latestUserMessage
-    );
-
-  if (asksForLinks || asksForVersionInfo) {
-    return true;
-  }
-
-  return asksForVerification && verifiesLinksOrVersions;
-}
-
-function shouldUseGoogleSearchForLatestRecommendations(
-  latestUserMessage: string
-) {
-  const normalizedMessage = latestUserMessage.trim().toLowerCase();
-
-  if (!normalizedMessage) {
-    return false;
-  }
-
-  if (
-    /^(hej|hejsan|hall[åa]|god morgon|god kv[äa]ll|tack|tusen tack|toppen|super|bra|okej|ok|ja|nej|mm+|japp|n[äa]pp)([.!? ]+)?$/i.test(
-      normalizedMessage
-    )
-  ) {
-    return false;
-  }
-
-  return true;
 }
 
 function collectErrorTexts(error: unknown, depth = 0): string[] {
@@ -881,7 +651,7 @@ async function generateWithGoogle(
   return sanitizeAppLinks(rawText);
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   res.setHeader("Cache-Control", "no-store");
 
   if (req.method !== "POST") {
