@@ -754,6 +754,13 @@ function createStyles(
       fontSize: 24 * scale,
       lineHeight: 1.6,
       color: mainText,
+      margin: "0 auto 12px",
+    },
+    disclaimer: {
+      maxWidth: 32 * 16,
+      fontSize: 15 * scale,
+      lineHeight: 1.5,
+      color: mutedText,
       margin: "0 auto 28px",
     },
     label: {
@@ -1449,6 +1456,10 @@ export default function App() {
 
         <p style={styles.intro}>
           Beskriv ett synrelaterat problem i vardagen så får du förslag på teknik som kan hjälpa.
+        </p>
+
+        <p style={styles.disclaimer}>
+          Svaren skapas av AI och kan innehålla fel. Se dem som förslag, inte som garanterade fakta.
         </p>
 
         {!hasConversation ? (
