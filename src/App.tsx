@@ -11,7 +11,7 @@ const EXAMPLES = [
 ];
 
 const INITIAL_REPLY = "Beskriv ditt problem så hjälper jag dig.";
-const THINKING_REPLY = "Clara tänker...";
+const THINKING_REPLY = "Clara tänker";
 const CLARA_VIOLET = "#34225C";
 const CLARA_LIGHT_VIOLET = "#C9C4D4";
 const CLARA_YELLOW = "#FEB93C";
@@ -30,6 +30,19 @@ const TEXT_SCALE_STEP = 0.15;
 
 function clampTextScale(value: number) {
   return Math.min(TEXT_SCALE_MAX, Math.max(TEXT_SCALE_MIN, value));
+}
+
+// Animerade punkter som visar att Clara jobbar med svaret. aria-hidden
+// eftersom texten bredvid ("Clara tänker") redan förmedlar samma sak
+// för skärmläsare.
+function ThinkingDots() {
+  return (
+    <span className="clara-thinking-dots" aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
 }
 type ConversationRole = "user" | "assistant";
 
@@ -1591,7 +1604,10 @@ export default function App() {
 
               {loading && (
                 <div style={styles.answerBox} aria-label="Clara tänker">
-                  <p style={styles.thinkingText}>{THINKING_REPLY}</p>
+                  <p style={styles.thinkingText}>
+                    {THINKING_REPLY}
+                    <ThinkingDots />
+                  </p>
                 </div>
               )}
             </section>
