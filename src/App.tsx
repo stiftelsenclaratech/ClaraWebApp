@@ -763,6 +763,38 @@ function createStyles(
       color: mutedText,
       margin: "0 auto 28px",
     },
+    helpToggle: {
+      display: "block",
+      margin: "20px auto 0",
+      padding: "8px 4px",
+      minHeight: 44,
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      color: headingColor,
+      fontFamily: "inherit",
+      fontWeight: 700,
+      fontSize: 15 * scale,
+      textDecoration: "underline",
+    },
+    helpPanel: {
+      maxWidth: 32 * 16,
+      margin: "12px auto 0",
+      textAlign: "left",
+      border: subtleBorder,
+      borderRadius: 16,
+      padding: "18px 20px",
+    },
+    helpList: {
+      margin: "0 0 18px 0",
+      paddingLeft: 22,
+      fontSize: 16 * scale,
+      lineHeight: 1.6,
+      color: mainText,
+    },
+    helpListItem: {
+      marginBottom: 8,
+    },
     label: {
       display: "block",
       fontSize: 20 * scale,
@@ -1022,6 +1054,7 @@ export default function App() {
   const [announcement, setAnnouncement] = useState<AnnouncementState>({
     text: "",
   });
+  const [helpOpen, setHelpOpen] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState>({
     messageId: null,
     text: "",
@@ -1451,6 +1484,38 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setHelpOpen((open) => !open)}
+          style={styles.helpToggle}
+          aria-expanded={helpOpen}
+          aria-controls="site-help-panel"
+        >
+          {helpOpen ? "Dölj: Så fungerar sidan" : "Så fungerar sidan"}
+        </button>
+
+        {helpOpen && (
+          <div style={styles.helpPanel} id="site-help-panel" role="region" aria-label="Så fungerar sidan">
+            <ul style={styles.helpList}>
+              <li style={styles.helpListItem}>
+                Högst upp kan du växla mellan ljust och mörkt läge, och öka eller minska textstorleken med knapparna "AA" och "AAA".
+              </li>
+              <li style={styles.helpListItem}>
+                Beskriv ditt problem i textfältet, till exempel "Jag kan inte läsa min post", eller välj ett av exemplen. Tryck sedan på "Få hjälp", eller tryck Enter.
+              </li>
+              <li style={styles.helpListItem}>
+                Medan Clara tar fram ett svar hör eller ser du "Clara tänker". Svaret läses automatiskt upp för dig när det är klart.
+              </li>
+              <li style={styles.helpListItem}>
+                När du har fått ett svar kan du trycka "Läs upp svaret" för att höra det igen, svara om det hjälpte, skriva en följdfråga längre ner, dela eller spara samtalet, eller börja om från början.
+              </li>
+              <li style={styles.helpListItem}>
+                Länkar i Claras svar går till appar eller webbsidor och öppnas i en ny flik.
+              </li>
+            </ul>
+          </div>
+        )}
 
         <hr style={styles.headerRule} />
 
