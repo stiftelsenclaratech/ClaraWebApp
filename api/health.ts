@@ -14,6 +14,14 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 // (maxOutputTokens 5, inget "tänkande", inget systemprompt, ingen sökning)
 // för att faktiskt testa samma kvot som appen använder - till en bråkdel
 // av kostnaden för ett riktigt svar.
+//
+// maxRetries var satt till 0 för att spara kostnad, men det gjorde
+// kontrollen alldeles för känslig: Googles korta, självläkande
+// "high demand"-blippar (samma sak som api/clara.ts redan hanterar med
+// egna omförsök) fick hälsokontrollen att larma falskt 2026-09-24, trots
+// att riktiga chattsvar gick igenom fint hela tiden. Några omförsök
+// kostar nästan inget extra eftersom de bara sker vid ett redan
+// misslyckat anrop, inte vid varje kontroll.
 
 type ApiResponse = {
   setHeader(name: string, value: string): void;
@@ -79,7 +87,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       model: google("gemini-flash-latest"),
       prompt: "hej",
       maxOutputTokens: 5,
-      maxRetries: 0,
+      maxRetries: 2,
       providerOptions: {
         google: {
           thinkingConfig: { thinkingBudget: 0 },
