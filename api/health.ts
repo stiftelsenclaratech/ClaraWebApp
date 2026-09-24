@@ -87,7 +87,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       model: google("gemini-flash-latest"),
       prompt: "hej",
       maxOutputTokens: 5,
-      maxRetries: 2,
+      // api/clara.ts är sammanlagt betydligt segare (SDK:ns egna 3 försök,
+      // och om det fortfarande misslyckas görs hela anropet om en gång
+      // till - upp till 6 försök totalt). 4 här är en kompromiss: mycket
+      // närmare den verkliga appens motståndskraft än tidigare (0), utan
+      // att hälsokontrollen själv blir långsam nog att tima ut hos den
+      // som övervakar den.
+      maxRetries: 4,
       providerOptions: {
         google: {
           thinkingConfig: { thinkingBudget: 0 },
