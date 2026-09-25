@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { track } from "@vercel/analytics";
+import { captureEvent } from "./analytics";
 import claraLogoDark from "./assets/clara-logo-dark.png";
 import claraLogoLight from "./assets/clara-logo-light.png";
 
@@ -1183,11 +1184,13 @@ export default function App() {
     // Anonym mätning: räknar bara om det här är samtalets första fråga
     // eller en följdfråga. Inget meddelandeinnehåll och ingen identifierare
     // skickas med.
+    const eventName = messages.length === 0 ? "conversation_started" : "follow_up_asked";
     try {
-      track(messages.length === 0 ? "conversation_started" : "follow_up_asked");
+      track(eventName);
     } catch {
       // mätning får aldrig störa samtalet
     }
+    captureEvent(eventName);
 
     const userMessage = createMessage("user", trimmedInput);
     const nextMessages = [...messages, userMessage];
@@ -1290,6 +1293,7 @@ export default function App() {
     } catch {
       // mätning får aldrig störa samtalet
     }
+    captureEvent("feedback", { value });
   }
 
   // Knappen får aldrig bli disabled (native disabled tar bort fokus och
