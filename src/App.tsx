@@ -867,6 +867,7 @@ function createStyles(
       padding: 26,
       textAlign: "left",
       border: subtleBorder,
+      scrollMarginTop: 16,
     },
     answerTitle: {
       margin: "0 0 8px 0",
@@ -1064,6 +1065,7 @@ export default function App() {
     Record<string, "yes" | "no">
   >({});
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
+  const latestAnswerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1144,10 +1146,18 @@ export default function App() {
       return;
     }
 
-    conversationEndRef.current?.scrollIntoView({
-      behavior: messages.length > 1 ? "smooth" : "auto",
-      block: "end",
-    });
+    const behavior: ScrollBehavior = messages.length > 1 ? "smooth" : "auto";
+    const lastMessage = messages[messages.length - 1];
+
+    // När ett nytt svar har kommit visas början av svaret överst på skärmen,
+    // så att den som läser inte behöver scrolla upp för att hitta var svaret
+    // börjar. Medan Clara tänker visas istället slutet av samtalet.
+    if (!loading && lastMessage?.role === "assistant") {
+      latestAnswerRef.current?.scrollIntoView({ behavior, block: "start" });
+      return;
+    }
+
+    conversationEndRef.current?.scrollIntoView({ behavior, block: "end" });
   }, [messages, loading]);
 
   const styles = useMemo(
@@ -1616,7 +1626,11 @@ export default function App() {
                 const isSpeaking = speakingMessageId === message.id;
 
                 return (
-                  <div key={message.id} style={styles.answerBox}>
+                  <div
+                    key={message.id}
+                    ref={isLatestAssistantMessage ? latestAnswerRef : undefined}
+                    style={styles.answerBox}
+                  >
                     <div>{formatReply(message.content, styles)}</div>
 
                     <div style={styles.messageActions}>
